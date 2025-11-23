@@ -62,4 +62,8 @@ chat_log_*.md
 *.md
 !README.md
 !DEPLOYMENT.md
+!GITHUB_SETUP.md
+!VPS_DEPLOYMENT.md
+
+
 
