@@ -246,33 +246,45 @@ async function scrapeQyyjt(url, username, password) {
         fs.writeFileSync('page_debug.html', html);
         console.log(`   📄 Saved page HTML to page_debug.html (Length: ${html.length})`);
 
-        summary: mainRelated.shortCompanyName || mainRelated.companyName || '查看',
-            source: item.originalSource || '',
-                related_enterprise: mainRelated.shortCompanyName || mainRelated.companyName || '',
-                    importance: mainRelated.importanceABS || '',
+        // Process captured API data
+        const data = [];
+        const getInfoListResponses = capturedData.filter(item =>
+            item.url.includes('/information/riskMonitor/getInfoList')
+        );
+
+        console.log(`📊 Processing ${getInfoListResponses.length} API responses...`);
+
+        getInfoListResponses.forEach(response => {
+            if (response.data && response.data.data && response.data.data.items) {
+                const items = response.data.data.items;
+                items.forEach(item => {
+                    const mainRelated = item.related && item.related.length > 0 ? item.related[0] : {};
+
+                    data.push({
+                        date: item.date ? item.date.replace(/(\d{4})(\d{2})(\d{2}).*/, '$1-$2-$3') : '',
+                        title: item.title || '',
+                        summary: mainRelated.shortCompanyName || mainRelated.companyName || '查看',
+                        source: item.originalSource || '',
+                        related_enterprise: mainRelated.shortCompanyName || mainRelated.companyName || '',
+                        importance: mainRelated.importanceABS || '',
                         sentiment: mainRelated.negative === '-1' ? '负面' : (mainRelated.negative === '1' ? '正面' : '中性'),
-                            level1_category: item.firstLevelName || '',
-                                level2_category: mainRelated.lastLevelName || '',
-                                    url: item.originalUrl || '' // This is the external URL!
-    };
-});
-        }
+                        level1_category: item.firstLevelName || '',
+                        level2_category: mainRelated.lastLevelName || '',
+                        url: item.originalUrl || ''
+                    });
+                });
+            }
+        });
 
-// Save captured API data
-if (capturedData.length > 0) {
-    fs.writeFileSync('api_response.json', JSON.stringify(capturedData, null, 2));
-    console.log(`💾 Saved ${capturedData.length} API responses to api_response.json`);
-}
-
-console.log(`✅ Extracted ${data.length} records`);
-return data;
+        console.log(`✅ Extracted ${data.length} records from API data`);
+        return data;
 
     } catch (error) {
-    console.error(`❌ Error scraping data: `, error.message);
-    throw error;
-} finally {
-    await browser.close();
-}
+        console.error(`❌ Error scraping data: `, error.message);
+        throw error;
+    } finally {
+        await browser.close();
+    }
 }
 
 /**
