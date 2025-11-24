@@ -9,9 +9,10 @@ import { FundChartModal } from '@/components/ui/fund-chart-modal'
 interface ProductDataModuleProps {
     funds: any[]
     loading: boolean
+    lastSyncTime?: string | null
 }
 
-export function ProductDataModule({ funds, loading }: ProductDataModuleProps) {
+export function ProductDataModule({ funds, loading, lastSyncTime }: ProductDataModuleProps) {
     const [selectedFund, setSelectedFund] = useState<any | null>(null)
 
 
@@ -21,7 +22,7 @@ export function ProductDataModule({ funds, loading }: ProductDataModuleProps) {
         { key: 'manager', label: '投资经理', sortable: true },
         { key: 'latest_nav_date', label: '最新净值日期', sortable: true, format: (v: string) => new Date(v).toLocaleDateString('zh-CN') },
         { key: 'daily_pnl', label: '本日收益', sortable: true, format: (v: number) => formatCurrency(v) },
-        { key: 'weekly_return', label: '本周收益率', sortable: true, format: (v: number) => formatPercent(v) },
+        { key: 'weekly_return', label: '七天内收益率', sortable: true, format: (v: number) => formatPercent(v) },
         { key: 'yearly_return', label: '本年收益率', sortable: true, format: (v: number) => formatPercent(v) },
         { key: 'concentration', label: '集中度', sortable: true, format: (v: number) => v ? formatPercentUnsigned(v) : '-' },
         { key: 'cost', label: '成本', sortable: true, format: (v: number) => formatCurrency(v) },
@@ -77,7 +78,25 @@ export function ProductDataModule({ funds, loading }: ProductDataModuleProps) {
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900">基金产品数据</h2>
+                <h2 className="text-xl font-bold text-gray-900">
+                    基金产品数据
+                    {lastSyncTime && (
+                        <span className="text-sm font-normal text-gray-500 ml-2">
+                            (数据更新于: {new Date(lastSyncTime).toLocaleString('zh-CN', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: false
+                            }).replace(/\//g, '/').replace(/,/g, '')})
+                        </span>
+                    )}
+                    <span className="text-xs font-normal text-blue-600 ml-3">
+                        (点击产品名称可查看收益率曲线图)
+                    </span>
+                </h2>
                 <div className="flex items-center space-x-4">
                     <div className="relative">
                         <input

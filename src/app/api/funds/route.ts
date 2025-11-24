@@ -33,14 +33,26 @@ export async function GET(request: NextRequest) {
       funds = fundsWithHistory
     }
 
+
     const strategyStats = await db.getStrategyStats(type === 'fof' ? 'fof' : 'main')
     const managerStats = await db.getManagerStats(type === 'fof' ? 'fof' : 'main')
+
+    // Get last sync time from sync_logs table
+    let lastSyncTime = null
+    try {
+      lastSyncTime = await db.getLastSyncTime() || new Date().toISOString()
+    } catch (err) {
+      console.error('Failed to get sync time:', err)
+      lastSyncTime = new Date().toISOString()
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         funds,
         strategyStats,
-        managerStats
+        managerStats,
+        lastSyncTime
       }
     })
 

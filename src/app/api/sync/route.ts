@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDatabase } from '@/lib/database-server'
-import pandas from 'pandas-js'
+
 
 export async function POST(request: NextRequest) {
   try {

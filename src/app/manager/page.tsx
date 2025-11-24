@@ -5,7 +5,7 @@ import { Navigation } from '@/components/ui/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ManagerRadarChart } from '@/components/charts/manager-radar-chart'
 import { TopFundsChart } from '@/components/charts/top-funds-chart'
-import { DataTable } from '@/components/ui/table'
+import { DataTable, TableColumn } from '@/components/ui/table'
 import { MetricCard } from '@/components/ui/metric-card'
 import { formatCurrency, formatPercent } from '@/lib/utils'
 
@@ -69,7 +69,7 @@ export default function ManagerPage() {
         const avgReturn = managerFunds.reduce((sum, fund) => sum + (fund.cumulative_return || 0), 0) / managerFunds.length
         const bestFund = managerFunds.reduce((best, fund) =>
           (fund.cumulative_return || 0) > (best.cumulative_return || 0) ? fund : best
-        , managerFunds[0])
+          , managerFunds[0])
 
         // 生成雷达图数据
         const radarData = [
@@ -150,7 +150,7 @@ export default function ManagerPage() {
     assets: manager.totalAssets
   }))
 
-  const managerColumns = [
+  const managerColumns: TableColumn[] = [
     { key: 'manager', title: '投资经理', sortable: true },
     { key: 'fundCount', title: '基金数量', sortable: true, format: 'number' },
     { key: 'totalAssets', title: '管理规模', sortable: true, format: 'currency' },
@@ -159,7 +159,7 @@ export default function ManagerPage() {
     { key: 'bestFundName', title: '最佳基金', sortable: true }
   ]
 
-  const fundColumns = [
+  const fundColumns: TableColumn[] = [
     { key: 'name', title: '基金名称', sortable: true },
     { key: 'strategy', title: '投资策略', sortable: true },
     { key: 'cumulative_return', title: '累计收益率', sortable: true, format: 'percent' },
@@ -173,17 +173,17 @@ export default function ManagerPage() {
   // 准备雷达图数据
   const radarData = selectedManagers.length === 2
     ? managerData
-        .filter(m => selectedManagers.includes(m.manager))
-        .reduce((acc, manager) => {
-          if (acc.length === 0) {
-            return manager.radarData || []
-          }
-          return acc.map((item, index) => ({
-            ...item,
-            [selectedManagers.indexOf(manager.manager) === 0 ? 'A' : 'B']:
-              manager.radarData?.[index]?.[selectedManagers.indexOf(manager.manager) === 0 ? 'A' : 'B'] || 0
-          }))
-        }, [] as any[])
+      .filter(m => selectedManagers.includes(m.manager))
+      .reduce((acc, manager) => {
+        if (acc.length === 0) {
+          return manager.radarData || []
+        }
+        return acc.map((item, index) => ({
+          ...item,
+          [selectedManagers.indexOf(manager.manager) === 0 ? 'A' : 'B']:
+            manager.radarData?.[index]?.[selectedManagers.indexOf(manager.manager) === 0 ? 'A' : 'B'] || 0
+        }))
+      }, [] as any[])
     : []
 
   return (

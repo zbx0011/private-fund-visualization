@@ -58,18 +58,21 @@ export function MobileTable({ data, columns, onItemClick }: MobileTableProps) {
                 {item[columns[0].key]}
               </h3>
               <div className="flex items-center gap-2">
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  isRedeemed ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-800'
-                }`}>
+                <span className={`text-xs px-2 py-1 rounded-full ${isRedeemed ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-800'
+                  }`}>
                   {item.status}
                 </span>
-                {columns.some(col => col.key.includes('return') || col.key.includes('Return')) && (
-                  <span className={`text-sm font-bold ${
-                    getColorByValue(Number(item[columns.find(col => col.key.includes('return') || col.key.includes('Return'))?.key] || 0))
-                  }`}>
-                    {formatPercent(Number(item[columns.find(col => col.key.includes('return') || col.key.includes('Return'))?.key] || 0))}
-                  </span>
-                )}
+                {(() => {
+                  const returnColumn = columns.find(col => col.key.includes('return') || col.key.includes('Return'));
+                  if (!returnColumn) return null;
+
+                  return (
+                    <span className={`text-sm font-bold ${getColorByValue(Number(item[returnColumn.key] || 0))
+                      }`}>
+                      {formatPercent(Number(item[returnColumn.key] || 0))}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
 

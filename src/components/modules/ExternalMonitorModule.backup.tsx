@@ -59,35 +59,35 @@ export function ExternalMonitorModule() {
             <table className="w-full text-sm text-left">
                 <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
                     <tr>
-                        <th className="px-2 py-1 font-medium text-xs">更新日期</th>
-                        <th className="px-2 py-1 font-medium text-xs">标题</th>
-                        <th className="px-2 py-1 font-medium text-xs">关联企业</th>
-                        <th className="px-2 py-1 font-medium text-xs">事件类型</th>
-                        <th className="px-2 py-1 font-medium text-xs">重要性</th>
-                        <th className="px-2 py-1 font-medium text-xs">正负面</th>
-                        <th className="px-2 py-1 font-medium text-xs">来源</th>
+                        <th className="px-4 py-3 font-medium">更新日期</th>
+                        <th className="px-4 py-3 font-medium">标题</th>
+                        <th className="px-4 py-3 font-medium">关联企业</th>
+                        <th className="px-4 py-3 font-medium">事件类型</th>
+                        <th className="px-4 py-3 font-medium">重要性</th>
+                        <th className="px-4 py-3 font-medium">正负面</th>
+                        <th className="px-4 py-3 font-medium">来源</th>
                     </tr>
                 </thead>
-                <tbody className="text-xs">
+                <tbody>
                     {loading ? (
                         <tr>
-                            <td colSpan={7} className="px-2 py-4 text-center text-gray-500">
+                            <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                                 加载中...
                             </td>
                         </tr>
                     ) : monitorData.length === 0 ? (
                         <tr>
-                            <td colSpan={7} className="px-2 py-4 text-center text-gray-500">
+                            <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                                 暂无数据
                             </td>
                         </tr>
                     ) : (
                         monitorData.map((item) => (
                             <tr key={item.id} className="border-b hover:bg-gray-50">
-                                <td className="px-2 py-1 text-gray-500 whitespace-nowrap">
+                                <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                                     {item.date}
                                 </td>
-                                <td className="px-2 py-1 font-medium text-gray-900">
+                                <td className="px-4 py-3 font-medium text-gray-900">
                                     <a
                                         href={item.url}
                                         target="_blank"
@@ -98,30 +98,30 @@ export function ExternalMonitorModule() {
                                         <ExternalLink className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </a>
                                 </td>
-                                <td className="px-2 py-1 text-gray-600">{item.related_enterprise}</td>
-                                <td className="px-2 py-1">
-                                    <div className="flex flex-col gap-0.5">
-                                        <span className="text-gray-900 text-xs">{item.level1_category}</span>
+                                <td className="px-4 py-3 text-gray-600">{item.related_enterprise}</td>
+                                <td className="px-4 py-3">
+                                    <div className="flex flex-col">
+                                        <span className="text-gray-900">{item.level1_category}</span>
                                         <span className="text-xs text-gray-500">{item.level2_category}</span>
                                     </div>
                                 </td>
-                                <td className="px-2 py-1">
-                                    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${item.importance === '高' ? 'bg-red-100 text-red-700' :
+                                <td className="px-4 py-3">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.importance === '高' ? 'bg-red-100 text-red-700' :
                                         item.importance === '中' ? 'bg-yellow-100 text-yellow-700' :
                                             'bg-gray-100 text-gray-700'
                                         }`}>
                                         {item.importance || '一般'}
                                     </span>
                                 </td>
-                                <td className="px-2 py-1">
-                                    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${item.sentiment === '负面' ? 'bg-red-50 text-red-600' :
+                                <td className="px-4 py-3">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.sentiment === '负面' ? 'bg-red-50 text-red-600' :
                                         item.sentiment === '正面' ? 'bg-green-50 text-green-600' :
                                             'bg-gray-50 text-gray-600'
                                         }`}>
                                         {item.sentiment || '中性'}
                                     </span>
                                 </td>
-                                <td className="px-2 py-1 text-gray-500">{item.source}</td>
+                                <td className="px-4 py-3 text-gray-500">{item.source}</td>
                             </tr>
                         ))
                     )}
@@ -131,7 +131,7 @@ export function ExternalMonitorModule() {
     )
 
     const renderCompanyView = () => (
-        <div className="space-y-4 p-4 bg-gray-50/50">
+        <div className="space-y-6 p-4 bg-gray-50/50">
             {loading ? (
                 <div className="text-center py-8 text-gray-500">加载中...</div>
             ) : Object.keys(groupedData).length === 0 ? (
@@ -140,21 +140,21 @@ export function ExternalMonitorModule() {
                 Object.entries(groupedData).map(([company, items]) => (
                     <div key={company} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                         {/* Company Header */}
-                        <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between bg-white">
+                        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-white">
                             <div className="flex items-center space-x-3">
-                                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                                <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
                                     {company.charAt(0)}
                                 </div>
-                                <h3 className="text-sm font-bold text-gray-900">{company}</h3>
+                                <h3 className="text-base font-bold text-gray-900">{company}</h3>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-xs rounded font-medium">
+                                <span className="px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded font-medium">
                                     全部 {items.length}
                                 </span>
-                                <span className="px-1.5 py-0.5 bg-gray-50 text-gray-600 text-xs rounded">
+                                <span className="px-2 py-1 bg-gray-50 text-gray-600 text-xs rounded">
                                     新闻 {items.filter(i => i.level1_category?.includes('新闻')).length}
                                 </span>
-                                <span className="px-1.5 py-0.5 bg-gray-50 text-gray-600 text-xs rounded">
+                                <span className="px-2 py-1 bg-gray-50 text-gray-600 text-xs rounded">
                                     公告 {items.filter(i => i.level1_category?.includes('公告')).length}
                                 </span>
                             </div>
@@ -165,45 +165,45 @@ export function ExternalMonitorModule() {
                             <table className="w-full text-sm text-left">
                                 <thead className="text-xs text-gray-500 bg-gray-50/50 border-b border-gray-100">
                                     <tr>
-                                        <th className="px-3 py-1.5 font-medium w-12 text-center">序号</th>
-                                        <th className="px-3 py-1.5 font-medium w-24">更新日期</th>
-                                        <th className="px-3 py-1.5 font-medium w-24">事件类型</th>
-                                        <th className="px-3 py-1.5 font-medium w-24">事件子项</th>
-                                        <th className="px-3 py-1.5 font-medium">标题</th>
-                                        <th className="px-3 py-1.5 font-medium w-16 text-center">重要性</th>
-                                        <th className="px-3 py-1.5 font-medium w-16 text-center">正负面</th>
-                                        <th className="px-3 py-1.5 font-medium w-20 text-center">来源</th>
+                                        <th className="px-4 py-2 font-medium w-16 text-center">序号</th>
+                                        <th className="px-4 py-2 font-medium w-24">更新日期</th>
+                                        <th className="px-4 py-2 font-medium w-24">事件类型</th>
+                                        <th className="px-4 py-2 font-medium w-24">事件子项</th>
+                                        <th className="px-4 py-2 font-medium">标题</th>
+                                        <th className="px-4 py-2 font-medium w-20 text-center">重要性</th>
+                                        <th className="px-4 py-2 font-medium w-20 text-center">正负面</th>
+                                        <th className="px-4 py-2 font-medium w-24 text-center">来源</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {items.map((item, index) => (
                                         <tr key={item.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
-                                            <td className="px-3 py-1.5 text-gray-500 text-center text-xs">{index + 1}</td>
-                                            <td className="px-3 py-1.5 text-gray-900 text-xs">{item.date.substring(5)}</td>
-                                            <td className="px-3 py-1.5 text-gray-600 text-xs">{item.level1_category}</td>
-                                            <td className="px-3 py-1.5 text-gray-600 text-xs">{item.level2_category}</td>
-                                            <td className="px-3 py-1.5">
+                                            <td className="px-4 py-3 text-gray-500 text-center">{index + 1}</td>
+                                            <td className="px-4 py-3 text-gray-900">{item.date.substring(5)}</td>
+                                            <td className="px-4 py-3 text-gray-600">{item.level1_category}</td>
+                                            <td className="px-4 py-3 text-gray-600">{item.level2_category}</td>
+                                            <td className="px-4 py-3">
                                                 <a
                                                     href={item.url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="text-gray-900 hover:text-blue-600 hover:underline block truncate max-w-md"
+                                                    className="text-gray-900 hover:text-blue-600 hover:underline block"
                                                 >
                                                     {item.title}
                                                 </a>
                                             </td>
-                                            <td className="px-3 py-1.5 text-center">
-                                                <span className="text-gray-600 text-xs">{item.importance || '一般'}</span>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className="text-gray-600">{item.importance || '一般'}</span>
                                             </td>
-                                            <td className="px-3 py-1.5 text-center">
-                                                <span className={`text-xs ${item.sentiment === '负面' ? 'text-red-500' :
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`${item.sentiment === '负面' ? 'text-red-500' :
                                                     item.sentiment === '正面' ? 'text-green-500' :
                                                         'text-gray-600'
                                                     }`}>
                                                     {item.sentiment || '中性'}
                                                 </span>
                                             </td>
-                                            <td className="px-3 py-1.5 text-gray-500 text-center text-xs">{item.source}</td>
+                                            <td className="px-4 py-3 text-gray-500 text-center">{item.source}</td>
                                         </tr>
                                     ))}
                                 </tbody>

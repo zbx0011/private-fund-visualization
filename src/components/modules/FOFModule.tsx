@@ -101,13 +101,14 @@ export function FOFModule() {
                                 </div>
                             ) : historyData.length > 0 ? (
                                 <YieldCurveChart
+                                    data={historyData.map((item: any) => ({
+                                        date: new Date(item.date).toLocaleDateString('zh-CN'),
+                                        value: item.cumulative_nav || item.unit_nav
+                                    }))}
                                     series={[{
+                                        id: 'value',
                                         name: selectedFund.name,
-                                        data: historyData.map((item: any) => ({
-                                            date: new Date(item.date).toLocaleDateString('zh-CN'),
-                                            value: item.cumulative_nav || item.unit_nav
-                                        })),
-                                        color: '#8b5cf6' // Purple for FOF
+                                        color: '#8b5cf6'
                                     }]}
                                 />
                             ) : (

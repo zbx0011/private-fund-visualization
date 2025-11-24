@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react'
 import { MetricCard } from '@/components/ui/metric-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { YieldCurveChart } from '@/components/charts/YieldCurveChart'
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { StrategyDistributionChart } from '@/components/charts/StrategyDistributionChart'
+import { formatCurrency } from '@/lib/utils'
+
 import { ProfitAnalysisChart } from '@/components/charts/ProfitAnalysisChart'
 
 const STRATEGY_TYPES = [
@@ -30,12 +32,21 @@ export function OverviewModule({ initialData, initialLoading = false, initialErr
     const [data, setData] = useState<any>(initialData)
     const [loading, setLoading] = useState(initialLoading)
     const [selectedStrategy, setSelectedStrategy] = useState<string>('all')
+    const [monitorData, setMonitorData] = useState<any[]>([])
 
     // Fetch full history data when component mounts
     useEffect(() => {
         const loadFullData = async () => {
             try {
                 setLoading(true)
+
+                // Fetch monitor data
+                const monitorRes = await fetch('/api/monitor?limit=50')
+                const monitorJson = await monitorRes.json()
+                if (monitorJson.success) {
+                    setMonitorData(monitorJson.data)
+                }
+
                 const res = await fetch('/api/funds?type=excluded-fof&includeHistory=true')
                 const json = await res.json()
                 if (json.success) {
@@ -82,7 +93,8 @@ export function OverviewModule({ initialData, initialLoading = false, initialErr
                         todayReturn,
                         weeklyReturn,
                         annualReturn,
-                        strategyData
+                        strategyData,
+                        lastSyncTime: json.data.lastSyncTime
                     })
                 }
             } catch (err) {
@@ -278,9 +290,9 @@ export function OverviewModule({ initialData, initialLoading = false, initialErr
     const { chartData, series } = getChartData()
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-4">
             {/* 1. 核心指标 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                 <MetricCard
                     title="总规模"
                     value={data.totalAssets}
@@ -300,7 +312,7 @@ export function OverviewModule({ initialData, initialLoading = false, initialErr
                     className="col-span-1"
                 />
                 <MetricCard
-                    title="本周收益率"
+                    title="七天内收益率"
                     value={data.weeklyReturn}
                     format="percent"
                     className="col-span-1"
@@ -315,23 +327,112 @@ export function OverviewModule({ initialData, initialLoading = false, initialErr
 
             {/* 2. 近期事件提示 */}
             <Card>
-                <CardHeader className="py-3">
-                    <CardTitle className="text-base">🔔 近期事件提示</CardTitle>
+                <CardHeader className="py-2">
+                    <CardTitle className="text-sm text-gray-900">🔔 近期事件提示</CardTitle>
                 </CardHeader>
-                <CardContent className="py-3">
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <div className="px-3 py-1 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-800 text-sm flex items-center">
-                            <span className="font-bold mr-2">提示:</span> 景林资产净值更新延迟 (2025-11-20)
-                        </div>
-                        <div className="px-3 py-1 bg-blue-50 border border-blue-200 rounded-md text-blue-800 text-sm flex items-center">
-                            <span className="font-bold mr-2">信息:</span> 新增 3 只基金产品 (2025-11-19)
-                        </div>
+                <CardContent className="py-2">
+                    <div className="flex flex-wrap gap-2">
+                        {/* 1. 外部信息监控中一周内有负面消息的 */}
+                        {monitorData
+                            .filter((m: any) => {
+                                const isNegative = m.sentiment === '负面'
+                                // Use m.date as the source of truth, fallback to created_at if needed
+                                const dateStr = m.date || m.created_at
+                                if (!dateStr) return false
+
+                                const date = new Date(dateStr)
+                                const oneWeekAgo = new Date()
+                                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+                                // Reset time part for accurate date comparison
+                                oneWeekAgo.setHours(0, 0, 0, 0)
+
+                                return isNegative && date >= oneWeekAgo
+                            })
+                            .map((m: any, i: number) => (
+                                <a
+                                    key={`monitor-${i}`}
+                                    href={m.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-3 py-1.5 bg-red-100 border border-red-200 rounded-md text-red-800 text-xs font-medium flex items-center shadow-sm hover:bg-red-200 transition-colors cursor-pointer"
+                                >
+                                    <span className="mr-1">📢</span>
+                                    <span>负面: {m.title} ({m.date})</span>
+                                </a>
+                            ))}
+
+                        {/* 2. 产品数据中本日收益大于十万或者亏损大于十万（也就是小于-10万）的产品 */}
+                        {data.funds
+                            .filter((f: any) => f.status !== '已赎回' && Math.abs(f.daily_pnl) > 100000)
+                            .map((f: any, i: number) => (
+                                <div
+                                    key={`pnl-${i}`}
+                                    className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center shadow-sm border ${f.daily_pnl > 0
+                                        ? 'bg-red-50 border-red-100 text-red-700'
+                                        : 'bg-green-50 border-green-100 text-green-700'
+                                        }`}
+                                >
+                                    <span className="mr-1">{f.daily_pnl > 0 ? '📈' : '📉'}</span>
+                                    <span>{f.name} ({formatCurrency(f.daily_pnl)})</span>
+                                </div>
+                            ))}
+
+                        {/* 3. 产品数据中集中度大于10%的产品（不包括比说碧烁太极二号） */}
+                        {data.funds
+                            .filter((f: any) => f.status !== '已赎回' && f.concentration > 0.1 && f.name !== '碧烁太极二号')
+                            .map((f: any, i: number) => (
+                                <div key={`conc-${i}`} className="px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-xs font-medium flex items-center shadow-sm">
+                                    <span className="mr-1">⚠️</span>
+                                    <span>高集中度: {f.name} ({(f.concentration * 100).toFixed(2)}%)</span>
+                                </div>
+                            ))}
+
+                        {/* 4. 出现当日的某类策略收益大于30万或者亏损大于30万（也就是小于-30万） */}
+                        {(() => {
+                            const strategyPnl = new Map<string, number>()
+                            data.funds.forEach((f: any) => {
+                                if (f.status !== '已赎回' && f.strategy && f.daily_pnl) {
+                                    strategyPnl.set(f.strategy, (strategyPnl.get(f.strategy) || 0) + f.daily_pnl)
+                                }
+                            })
+                            return Array.from(strategyPnl.entries())
+                                .filter(([_, pnl]) => Math.abs(pnl) > 300000)
+                                .map(([strategy, pnl], i) => (
+                                    <div
+                                        key={`strat-${i}`}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center shadow-sm border ${pnl > 0
+                                            ? 'bg-orange-50 border-orange-100 text-orange-700'
+                                            : 'bg-blue-50 border-blue-100 text-blue-700'
+                                            }`}
+                                    >
+                                        <span className="mr-1">{pnl > 0 ? '🚀' : '🌊'}</span>
+                                        <span>策略{pnl > 0 ? '大涨' : '大跌'}: {strategy} ({formatCurrency(pnl)})</span>
+                                    </div>
+                                ))
+                        })()}
+
+                        {/* Fallback if no events */}
+                        {(!monitorData.some((m: any) => {
+                            const dateStr = m.date || m.created_at
+                            if (!dateStr) return false
+                            const date = new Date(dateStr)
+                            const oneWeekAgo = new Date()
+                            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+                            oneWeekAgo.setHours(0, 0, 0, 0)
+                            return m.sentiment === '负面' && date >= oneWeekAgo
+                        }) &&
+                            !data.funds.some((f: any) => f.status !== '已赎回' && Math.abs(f.daily_pnl) > 100000) &&
+                            !data.funds.some((f: any) => f.status !== '已赎回' && f.concentration > 0.1 && f.name !== '碧烁太极二号') &&
+                            !Array.from(new Set(data.funds.map((f: any) => f.strategy))).some((s: any) => Math.abs(data.funds.filter((f: any) => f.status !== '已赎回' && f.strategy === s).reduce((sum: number, f: any) => sum + (f.daily_pnl || 0), 0)) > 300000)
+                        ) && (
+                                <div className="text-gray-500 text-xs italic px-2">暂无重要事件提示</div>
+                            )}
                     </div>
                 </CardContent>
             </Card>
 
             {/* 3. 收益比较 */}
-            <ProfitAnalysisChart funds={data.funds} />
+            <ProfitAnalysisChart funds={data.funds} lastSyncTime={data.lastSyncTime} />
 
             {/* 4. 收益率曲线 */}
             <Card>
@@ -373,35 +474,11 @@ export function OverviewModule({ initialData, initialLoading = false, initialErr
             {/* 5. 策略分布 */}
             <Card>
                 <CardHeader>
-                    <CardTitle>🥧 策略分布</CardTitle>
+                    <CardTitle className="text-gray-900">🥧 策略分布</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {data.strategyData && data.strategyData.length > 0 ? (
-                        <div className="h-[300px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={data.strategyData}
-                                        cx="50%"
-                                        cy="50%"
-                                        labelLine={false}
-                                        label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                        outerRadius={100}
-                                        fill="#8884d8"
-                                        dataKey="value"
-                                        nameKey="strategy"
-                                    >
-                                        {data.strategyData.map((entry: any, index: number) => (
-                                            <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#8b5cf6', '#d946ef'][index % 10]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip
-                                        formatter={(value: number, name: string) => [`¥${(value / 10000).toFixed(2)}万`, name]}
-                                    />
-                                    <Legend wrapperStyle={{ fontSize: '12px' }} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
+                        <StrategyDistributionChart data={data.strategyData} />
                     ) : (
                         <div className="h-[300px] flex items-center justify-center text-gray-400">
                             暂无策略分布数据

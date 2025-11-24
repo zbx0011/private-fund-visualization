@@ -5,7 +5,7 @@ import { Navigation } from '@/components/ui/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StrategyBarChart } from '@/components/charts/strategy-bar-chart'
 import { StrategyPieChart } from '@/components/charts/strategy-pie-chart'
-import { DataTable } from '@/components/ui/table'
+import { DataTable, TableColumn } from '@/components/ui/table'
 import { MetricCard } from '@/components/ui/metric-card'
 import { formatCurrency, formatPercent } from '@/lib/utils'
 
@@ -139,7 +139,7 @@ export default function StrategyPage() {
     count: item.fundCount
   }))
 
-  const strategyColumns = [
+  const strategyColumns: TableColumn[] = [
     { key: 'strategy', title: '策略类型', sortable: true },
     { key: 'fundCount', title: '基金数量', sortable: true, format: 'number' },
     { key: 'avgReturn', title: '平均收益率', sortable: true, format: 'percent' },
@@ -148,7 +148,7 @@ export default function StrategyPage() {
     { key: 'totalAssets', title: '总规模', sortable: true, format: 'currency' }
   ]
 
-  const fundColumns = [
+  const fundColumns: TableColumn[] = [
     { key: 'name', title: '基金名称', sortable: true },
     { key: 'manager', title: '投资经理', sortable: true },
     { key: 'cumulative_return', title: '累计收益率', sortable: true, format: 'percent' },

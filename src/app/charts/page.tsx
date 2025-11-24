@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Navigation } from '@/components/ui/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { MultiLineChart } from '@/components/charts/multi-line-chart'
-import { DataTable } from '@/components/ui/table'
+import { DataTable, TableColumn } from '@/components/ui/table'
 import { MetricCard } from '@/components/ui/metric-card'
 import { formatCurrency, formatPercent, calculateDateRange } from '@/lib/utils'
 
@@ -153,7 +153,7 @@ export default function ChartsPage() {
     )
   }
 
-  const fundColumns = [
+  const fundColumns: TableColumn[] = [
     { key: 'name', title: '基金名称', sortable: true },
     { key: 'strategy', title: '策略', sortable: true },
     { key: 'manager', title: '投资经理', sortable: true },
@@ -198,16 +198,15 @@ export default function ChartsPage() {
                     <button
                       key={range}
                       onClick={() => setTimeRange(range)}
-                      className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                        timeRange === range
+                      className={`px-3 py-1 text-sm rounded-md transition-colors ${timeRange === range
                           ? 'bg-blue-600 text-white'
                           : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
+                        }`}
                     >
                       {range === '1M' ? '1月' :
-                       range === '3M' ? '3月' :
-                       range === '6M' ? '6月' :
-                       range === '1Y' ? '1年' : '全部'}
+                        range === '3M' ? '3月' :
+                          range === '6M' ? '6月' :
+                            range === '1Y' ? '1年' : '全部'}
                     </button>
                   ))}
                 </div>

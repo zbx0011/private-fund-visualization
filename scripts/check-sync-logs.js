@@ -1,20 +1,15 @@
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, '../data/funds.db');
-const db = new sqlite3.Database(DB_PATH);
+const dbPath = path.join(process.cwd(), 'data', 'funds.db');
+const db = new Database(dbPath);
 
-db.serialize(() => {
-    db.all("SELECT * FROM sync_logs ORDER BY created_at DESC LIMIT 5", (err, rows) => {
-        if (err) console.error(err);
-        else {
-            console.log('--- Recent Sync Logs ---');
-            rows.forEach(row => {
-                console.log(`Type: ${row.sync_type}, Status: ${row.status}, Time: ${row.created_at}`);
-                if (row.error_message) console.log(`Error: ${row.error_message}`);
-            });
-        }
-    });
-});
+try {
+    const logs = db.prepare('SELECT * FROM sync_logs ORDER BY created_at DESC LIMIT 5').all();
+    console.log('Recent Sync Logs:', logs);
 
-db.close();
+    const successLog = db.prepare("SELECT sync_end FROM sync_logs WHERE status = 'success' ORDER BY sync_end DESC LIMIT 1").get();
+    console.log('Latest Success Log:', successLog);
+} catch (error) {
+    console.error('Error querying sync_logs:', error);
+}

@@ -7,12 +7,13 @@ import { formatCurrency, formatPercent } from '@/lib/utils'
 
 interface ProfitAnalysisChartProps {
     funds: any[]
+    lastSyncTime?: string | null
 }
 
 type ViewType = 'product' | 'strategy' | 'manager'
 type TimeRange = 'daily' | 'weekly' | 'yearly'
 
-export function ProfitAnalysisChart({ funds }: ProfitAnalysisChartProps) {
+export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChartProps) {
     const [viewType, setViewType] = useState<ViewType>('product')
     const [timeRange, setTimeRange] = useState<TimeRange>('daily')
 
@@ -39,7 +40,8 @@ export function ProfitAnalysisChart({ funds }: ProfitAnalysisChartProps) {
                     value: getValue(f),
                     // Extra info for tooltip
                     strategy: f.strategy,
-                    manager: f.manager
+                    manager: f.manager,
+                    latest_nav_date: f.latest_nav_date
                 }))
                 .sort((a, b) => a.value - b.value) // Sort by value ascending (Losses Left, Profits Right)
         } else {
@@ -88,7 +90,7 @@ export function ProfitAnalysisChart({ funds }: ProfitAnalysisChartProps) {
 
     const getTitle = () => {
         const viewMap = { product: '基金产品', strategy: '策略', manager: '投资经理' }
-        const timeMap = { daily: '当日收益', weekly: '本周收益率', yearly: '本年收益率' }
+        const timeMap = { daily: '当日收益', weekly: '七天内收益率', yearly: '本年收益率' }
         return `${viewMap[viewType]} - ${timeMap[timeRange]}分布`
     }
 
@@ -97,12 +99,60 @@ export function ProfitAnalysisChart({ funds }: ProfitAnalysisChartProps) {
         return formatPercent(val)
     }
 
+    // Custom tooltip renderer
+    const CustomTooltip = ({ active, payload }: any) => {
+        if (active && payload && payload.length) {
+            const data = payload[0].payload
+            // Format date to show only YYYY-MM-DD
+            const formatDate = (dateStr: string) => {
+                if (!dateStr) return ''
+                const date = new Date(dateStr)
+                return date.toISOString().split('T')[0]
+            }
+            return (
+                <div style={{
+                    backgroundColor: 'white',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    border: 'none'
+                }}>
+                    <p style={{ color: '#333', fontWeight: 'bold', marginBottom: '8px' }}>{data.name}</p>
+                    <p style={{ color: '#666', margin: '4px 0' }}>
+                        {timeRange === 'daily' ? '收益' : '收益率'}: <span style={{ fontWeight: 'bold' }}>{formatValue(data.value)}</span>
+                    </p>
+                    {viewType === 'product' && data.latest_nav_date && (
+                        <p style={{ color: '#999', fontSize: '12px', marginTop: '4px' }}>
+                            最新净值日期: {formatDate(data.latest_nav_date)}
+                        </p>
+                    )}
+                </div>
+            )
+        }
+        return null
+    }
+
     return (
         <Card>
             <CardHeader>
                 <div className="flex flex-col space-y-4">
                     <div className="flex items-center justify-between">
-                        <CardTitle>📊 收益比较</CardTitle>
+                        <CardTitle className="text-gray-900">
+                            📊 收益比较
+                            {lastSyncTime && (
+                                <span className="text-sm font-normal text-gray-500 ml-2">
+                                    (数据更新于: {new Date(lastSyncTime).toLocaleString('zh-CN', {
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        second: '2-digit',
+                                        hour12: false
+                                    }).replace(/\//g, '/').replace(/,/g, '')})
+                                </span>
+                            )}
+                        </CardTitle>
                     </div>
 
                     <div className="flex flex-col md:flex-row justify-between gap-4">
@@ -133,7 +183,7 @@ export function ProfitAnalysisChart({ funds }: ProfitAnalysisChartProps) {
                                         : 'text-gray-500 hover:text-gray-900'
                                         }`}
                                 >
-                                    {range === 'daily' ? '当日' : range === 'weekly' ? '本周' : '本年'}
+                                    {range === 'daily' ? '当日' : range === 'weekly' ? '7日' : '本年'}
                                 </button>
                             ))}
                         </div>
@@ -164,11 +214,7 @@ export function ProfitAnalysisChart({ funds }: ProfitAnalysisChartProps) {
                                     return (val * 100).toFixed(1) + '%'
                                 }}
                             />
-                            <Tooltip
-                                formatter={(value: number) => [formatValue(value), timeRange === 'daily' ? '收益' : '收益率']}
-                                labelStyle={{ color: '#333' }}
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                            />
+                            <Tooltip content={<CustomTooltip />} />
                             <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                                 {chartData.map((entry, index) => (
                                     <Cell

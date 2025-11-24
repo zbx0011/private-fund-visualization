@@ -10,11 +10,13 @@
     "lint": "eslint",
     "init-db": "node scripts/init-database.js",
     "sync-data": "node scripts/sync-data.js",
-    "lark-sync": "node scripts/lark-sync-cli.js"
+    "lark-sync": "node scripts/lark-sync-cli.js",
+    "schedule-sync": "node scripts/schedule-sync.js"
   },
   "dependencies": {
     "@types/sqlite3": "^3.1.11",
     "axios": "^1.13.2",
+    "better-sqlite3": "^12.4.6",
     "cheerio": "^1.1.2",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -22,6 +24,8 @@
     "lucide-react": "^0.554.0",
     "next": "16.0.3",
     "next-themes": "^0.4.6",
+    "node-schedule": "^2.1.1",
+    "puppeteer": "^24.31.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "recharts": "^3.4.1",

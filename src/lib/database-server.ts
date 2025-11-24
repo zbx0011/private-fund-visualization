@@ -103,7 +103,7 @@ export class Database {
       this.db.all(`
         SELECT f.*, h.daily_return as history_daily_return
         FROM funds f
-        LEFT JOIN fund_nav_history h ON f.record_id = h.fund_id AND f.latest_nav_date = h.nav_date
+        LEFT JOIN fund_nav_history h ON f.name = h.fund_id AND f.latest_nav_date = h.nav_date
         WHERE f.source_table = ?
         ORDER BY f.yearly_return DESC
       `, [source], (err, rows) => {
@@ -127,7 +127,7 @@ export class Database {
       this.db.all(`
         SELECT f.*, h.daily_return as history_daily_return
         FROM funds f
-        LEFT JOIN fund_nav_history h ON f.record_id = h.fund_id AND f.latest_nav_date = h.nav_date
+        LEFT JOIN fund_nav_history h ON f.name = h.fund_id AND f.latest_nav_date = h.nav_date
         WHERE f.strategy = ? AND f.source_table = ?
         ORDER BY f.yearly_return DESC
       `, [strategy, source], (err, rows) => {
@@ -142,7 +142,7 @@ export class Database {
       this.db.all(`
         SELECT f.*, h.daily_return as history_daily_return
         FROM funds f
-        LEFT JOIN fund_nav_history h ON f.record_id = h.fund_id AND f.latest_nav_date = h.nav_date
+        LEFT JOIN fund_nav_history h ON f.name = h.fund_id AND f.latest_nav_date = h.nav_date
         WHERE f.manager = ? AND f.source_table = ?
         ORDER BY f.yearly_return DESC
       `, [manager, source], (err, rows) => {
@@ -214,6 +214,82 @@ export class Database {
         if (err) reject(err)
         else resolve(rows)
       })
+    })
+  }
+
+  async getLastSyncTime(): Promise<string | null> {
+    return new Promise((resolve, reject) => {
+      this.db.get('SELECT sync_end FROM sync_logs WHERE status = ? ORDER BY sync_end DESC LIMIT 1', ['success'], (err, row: any) => {
+        if (err) reject(err)
+        else resolve(row ? row.sync_end : null)
+      })
+    })
+  }
+
+  // 插入数据操作
+  async insertFund(fund: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const stmt = this.db.prepare(`
+        INSERT INTO funds (
+          record_id, name, strategy, manager, latest_nav_date, 
+          cumulative_return, annualized_return, max_drawdown, sharpe_ratio, volatility,
+          total_assets, standing_assets, cash_allocation, status,
+          establishment_date, cost, scale
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      stmt.run([
+        fund.id,
+        fund.name,
+        fund.strategy,
+        fund.manager,
+        fund.latestNavDate,
+        fund.cumulativeReturn,
+        fund.annualizedReturn,
+        fund.maxDrawdown,
+        fund.sharpeRatio,
+        fund.volatility,
+        fund.totalAssets,
+        fund.standingAssets,
+        fund.cashAllocation,
+        fund.status,
+        fund.establishmentDate,
+        fund.cost,
+        fund.scale
+      ], (err) => {
+        if (err) reject(err)
+        else resolve()
+      })
+      stmt.finalize()
+    })
+  }
+
+  async insertNavHistory(history: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const stmt = this.db.prepare(`
+        INSERT INTO fund_nav_history (
+          fund_id, nav_date, unit_nav, cumulative_nav, daily_return,
+          total_assets, status, record_time, cost, market_value, position_change
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      stmt.run([
+        history.fundId,
+        history.navDate,
+        history.unitNav,
+        history.cumulativeNav,
+        history.dailyReturn,
+        history.totalAssets,
+        history.status,
+        history.recordTime,
+        history.cost,
+        history.marketValue,
+        history.positionChange
+      ], (err) => {
+        if (err) reject(err)
+        else resolve()
+      })
+      stmt.finalize()
     })
   }
 

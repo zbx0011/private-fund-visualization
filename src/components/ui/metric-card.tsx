@@ -33,26 +33,26 @@ export function MetricCard({
 
   return (
     <div className={cn(
-      'rounded-lg border bg-white p-6 shadow-sm',
+      'rounded-lg border bg-white p-3 shadow-sm',
       className
     )}>
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-gray-600">{title}</p>
+        <p className="text-xs font-medium text-gray-600">{title}</p>
         {change !== undefined && (
           <span className={cn(
-            'text-sm font-medium',
+            'text-xs font-medium',
             getColorByValue(change)
           )}>
             {change >= 0 ? '↑' : '↓'} {formatPercent(Math.abs(change))}
           </span>
         )}
       </div>
-      <div className="mt-2">
-        <p className="text-3xl font-bold text-gray-900">
+      <div className="mt-1">
+        <p className="text-2xl font-bold text-gray-900">
           {formatValue(value)}
         </p>
         {change !== undefined && (
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-gray-500 mt-0.5">
             {changeLabel}
           </p>
         )}

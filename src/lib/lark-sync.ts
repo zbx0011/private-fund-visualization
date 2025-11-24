@@ -5,6 +5,8 @@ import { getDatabase } from './database-server'
 interface SyncConfig {
   appToken: string
   tables?: Array<{ id: string; type: 'main' | 'fof' }>
+  tableId?: string
+  autoDetectTable?: boolean
 }
 
 interface SyncResult {
@@ -42,11 +44,21 @@ export class LarkSyncService {
     try {
       console.log('开始从飞书多维表格同步数据...')
 
-      const tablesToSync = config.tables || [
-        { id: 'tblcXqDbfgA0x533', type: 'main' }, // 私募取数表 (Primary data source)
-        { id: 'tblcK2mWFtgob3Dg', type: 'main' }, // 私募盈亏一览表 (For concentration field)
-        { id: 'tblXwpq4lQzfymME', type: 'fof' }   // 第一创业FOF
-      ]
+      let tablesToSync = config.tables;
+
+      // If specific tableId is provided, use it
+      if (!tablesToSync && config.tableId) {
+        tablesToSync = [{ id: config.tableId, type: 'main' }];
+      }
+
+      // Default tables if nothing specified
+      if (!tablesToSync) {
+        tablesToSync = [
+          { id: 'tblcXqDbfgA0x533', type: 'main' }, // 私募取数表 (Primary data source)
+          { id: 'tblcK2mWFtgob3Dg', type: 'main' }, // 私募盈亏一览表 (For concentration field)
+          { id: 'tblXwpq4lQzfymME', type: 'fof' }   // 第一创业FOF
+        ]
+      }
 
       console.log(`配置的表格数量: ${tablesToSync.length}`)
       tablesToSync.forEach((t, i) => console.log(`  ${i + 1}. ${t.id} (${t.type})`))
@@ -150,7 +162,7 @@ export class LarkSyncService {
       const tables = await this.api.getBitableTables(appToken)
 
       // 优先查找包含"基金"、"私募"等关键词的表格
-      const fundTables = tables.filter(table => {
+      const fundTables = tables.filter((table: any) => {
         const name = table.name.toLowerCase()
         return name.includes('基金') || name.includes('私募') || name.includes('投资')
       })
@@ -211,7 +223,7 @@ export class LarkSyncService {
       dbInstance.get(
         'SELECT id FROM funds WHERE name = ? AND (manager = ? OR manager IS NULL)',
         [name, manager || ''],
-        (err, row) => {
+        (err: Error | null, row: any) => {
           if (err) reject(err)
           else resolve(row)
         }
@@ -291,7 +303,7 @@ export class LarkSyncService {
 
       const stmt = dbInstance.prepare(sql)
 
-      stmt.run(values, (err) => {
+      stmt.run(values, (err: Error | null) => {
         if (err) reject(err)
         else resolve()
       })
@@ -338,7 +350,7 @@ export class LarkSyncService {
         fund.dailyPnl || 0,
         fund.concentration || 0,
         (fund as any).source_table
-      ], (err) => {
+      ], (err: Error | null) => {
         if (err) reject(err)
         else resolve()
       })
@@ -370,7 +382,7 @@ export class LarkSyncService {
           url: app.url,
           avatar: app.avatar
         },
-        tables: tables.map(table => ({
+        tables: tables.map((table: any) => ({
           table_id: table.table_id,
           name: table.name,
           revision: table.revision
@@ -393,7 +405,7 @@ export class LarkSyncService {
     return new Promise((resolve, reject) => {
       dbInstance.serialize(() => {
         // 清空历史数据表
-        dbInstance.run('DELETE FROM fund_nav_history', (err) => {
+        dbInstance.run('DELETE FROM fund_nav_history', (err: Error | null) => {
           if (err) {
             console.error('清空历史数据失败:', err)
             reject(err)
@@ -435,7 +447,7 @@ export class LarkSyncService {
                 cost,
                 marketValue,
                 positionChange
-              ], (err) => {
+              ], (err: Error | null) => {
                 if (err) {
                   console.error(`插入历史数据失败 ${fundName}:`, err)
                 } else {
@@ -447,7 +459,7 @@ export class LarkSyncService {
             }
           }
 
-          stmt.finalize((err) => {
+          stmt.finalize((err: Error | null) => {
             if (err) reject(err)
             else resolve({ inserted })
           })
@@ -468,7 +480,7 @@ export class LarkSyncService {
       // 获取所有基金的历史数据
       dbInstance.all(`
         SELECT DISTINCT fund_id FROM fund_nav_history
-      `, async (err, funds: any[]) => {
+      `, async (err: Error | null, funds: any[]) => {
         if (err) {
           reject(err)
           return
@@ -499,7 +511,7 @@ export class LarkSyncService {
         FROM fund_nav_history
         WHERE fund_id = ? AND cumulative_nav > 0
         ORDER BY nav_date ASC
-      `, [fundId], (err: any, history: any[]) => {
+      `, [fundId], (err: Error | null, history: any[]) => {
         if (err) {
           reject(err)
           return
@@ -590,7 +602,7 @@ export class LarkSyncService {
         metrics.volatility,
         metrics.annualizedReturn,
         fundId
-      ], (err) => {
+      ], (err: Error | null) => {
         if (err) reject(err)
         else resolve()
       })

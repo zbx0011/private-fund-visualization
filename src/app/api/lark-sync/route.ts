@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       recordsProcessed: result.recordsProcessed,
       recordsUpdated: result.recordsUpdated,
       recordsInserted: result.recordsInserted,
-      errorMessage: result.errors.join('; ') || null,
+      errorMessage: result.errors.join('; ') || undefined,
       appToken,
       tableId: tableId || 'auto-detected'
     })
@@ -154,9 +154,9 @@ async function logSyncResult(logData: {
       logData.errorMessage || null,
       now.toISOString(),
       new Date().toISOString()
-    ], (err) => {
+    ], (err: Error | null) => {
       if (err) reject(err)
-      else resolve()
+      else resolve(undefined)
     })
 
     stmt.finalize()
@@ -177,7 +177,7 @@ async function getSyncHistory() {
       WHERE sync_type = 'lark_bitable'
       ORDER BY created_at DESC
       LIMIT 20
-    `, (err, rows) => {
+    `, (err: Error | null, rows: any[]) => {
       if (err) reject(err)
       else resolve(rows)
     })

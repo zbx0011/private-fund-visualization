@@ -8,6 +8,7 @@ export default function ProductsPage() {
     const [funds, setFunds] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [lastSyncTime, setLastSyncTime] = useState<string | null>(null)
 
     useEffect(() => {
         loadData()
@@ -25,6 +26,7 @@ export default function ProductsPage() {
             if (!result.success) throw new Error(result.error || '数据获取失败')
 
             setFunds(result.data.funds)
+            setLastSyncTime(result.data.lastSyncTime)
 
         } catch (err) {
             console.error('加载产品数据失败:', err)
@@ -62,6 +64,7 @@ export default function ProductsPage() {
                 <ProductDataModule
                     funds={funds}
                     loading={loading}
+                    lastSyncTime={lastSyncTime}
                 />
             </div>
         </div>

@@ -22,12 +22,7 @@ import {
 const navigationItems = [
   { href: '/', label: '总览仪表盘', icon: TrendingUp },
   { href: '/products', label: '产品数据', icon: ClipboardList },
-  { href: '/fof', label: '第一创业FOF', icon: Building2 },
   { href: '/monitor', label: '外部信息监控', icon: Search },
-  { href: '/strategy', label: '策略分析', icon: BarChart3 },
-  { href: '/manager', label: '投资经理', icon: Users },
-  { href: '/charts', label: '收益图表', icon: LineChart },
-  { href: '/data', label: '数据表', icon: Table },
   { href: '/settings', label: '设置', icon: Settings },
 ]
 
@@ -55,13 +50,13 @@ export function Navigation() {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      'inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium',
+                      'inline-flex items-center px-4 py-2 rounded-md text-base font-medium transition-colors',
                       pathname === item.href
-                        ? 'border-blue-500 text-gray-900'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                     )}
                   >
-                    <Icon className="h-4 w-4 mr-2" />
+                    <Icon className="h-5 w-5 mr-2" />
                     {item.label}
                   </Link>
                 )
@@ -122,7 +117,7 @@ export function Navigation() {
 
       {/* Bottom Navigation for Mobile */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
-        <div className="grid grid-cols-7 gap-0">
+        <div className="grid grid-cols-4 gap-0">
           {navigationItems.map((item) => {
             const Icon = item.icon
             return (
