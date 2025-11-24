@@ -76,223 +76,165 @@ async function scrapeQyyjt(url, username, password) {
 
     const isLinux = process.platform === 'linux';
     const executablePath = isLinux
-        ? '/usr/bin/chromium-browser'
-        : 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+    const request = response.request();
+    if (request.resourceType() === 'xhr' || request.resourceType() === 'fetch') {
+        try {
+            const contentType = response.headers()['content-type'];
+            if (contentType && contentType.includes('application/json')) {
+                const json = await response.json();
+                // Check if this JSON looks like our data
+                // Look for known keywords or structure
+                const str = JSON.stringify(json);
+                if (str.includes('新闻') || str.includes('公告') || str.includes('list')) {
+                    console.log(`📡 Captured API response from: ${request.url()}`);
+                    // console.log('   Data preview:', str.substring(0, 200));
+                    capturedData.push({ url: request.url(), data: json });
+                }
+            }
+        } catch (e) {
+            // Ignore errors (e.g. 304 Not Modified, empty body)
+        }
+    }
+});
 
-    console.log(`   Running on ${process.platform}, using browser: ${executablePath}`);
+console.log(`📄 Navigating to target page: ${url}`);
+await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
-    const browser = await puppeteer.launch({
-        headless: isLinux ? true : false, // Headless on VPS, visible on Windows
-        defaultViewport: null,
-        userDataDir: './user_data',
-        executablePath: executablePath,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-blink-features=AutomationControlled',
-            '--start-maximized',
-            '--disable-dev-shm-usage' // Fix for low memory in containers
-        ]
+// Wait a bit for potential redirects
+await new Promise(resolve => setTimeout(resolve, 5000));
+
+// Check if we need to log in
+let needsLogin = await page.evaluate(() => {
+    return location.href.includes('login') || !!document.querySelector('input[type="password"]') || document.title.includes('登录');
+});
+
+if (needsLogin) {
+    console.log('\n🛑 Authentication required!');
+
+    if (username && password) {
+        console.log('🔄 Attempting automatic login...');
+        await login(page, username, password);
+    } else {
+        // Check if fields are already filled (e.g. by autofill or user)
+        const hasFilledInputs = await page.evaluate(() => {
+            const user = document.querySelector('input[placeholder*="手机"], input[placeholder*="账号"], input[type="text"]');
+            const pass = document.querySelector('input[placeholder*="密码"], input[type="password"]');
+            return user && user.value && pass && pass.value;
+        });
+
+        if (hasFilledInputs) {
+            console.log('👀 Detected filled login fields. Attempting to click login...');
+            const submitSelector = '.login-btn, button[type="submit"], .submit';
+            await page.click(submitSelector);
+            await new Promise(r => setTimeout(r, 3000)); // Wait for click to register
+        }
+    }
+
+    // Re-check login status
+    needsLogin = await page.evaluate(() => {
+        return location.href.includes('login') || !!document.querySelector('input[type="password"]') || document.title.includes('登录');
     });
 
-    try {
-        const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    if (needsLogin) {
+        console.log('⚠️  Automatic login failed or not configured.');
+        console.log('👉 Please manually log in to the website in the opened browser window.');
+        console.log('⏳ Waiting for you to log in and navigate to the data page...');
 
-        // Monitor network responses to find the data API
-        const capturedData = [];
-        page.on('response', async response => {
-            const request = response.request();
-            if (request.resourceType() === 'xhr' || request.resourceType() === 'fetch') {
-                try {
-                    const contentType = response.headers()['content-type'];
-                    if (contentType && contentType.includes('application/json')) {
-                        const json = await response.json();
-                        // Check if this JSON looks like our data
-                        // Look for known keywords or structure
-                        const str = JSON.stringify(json);
-                        if (str.includes('新闻') || str.includes('公告') || str.includes('list')) {
-                            console.log(`📡 Captured API response from: ${request.url()}`);
-                            // console.log('   Data preview:', str.substring(0, 200));
-                            capturedData.push({ url: request.url(), data: json });
-                        }
-                    }
-                } catch (e) {
-                    // Ignore errors (e.g. 304 Not Modified, empty body)
-                }
-            }
-        });
+        // Wait until we are on the target page and table exists
+        await page.waitForFunction(() => {
+            return !location.href.includes('login') && !document.title.includes('登录') && document.querySelector('table, .el-table, .table-container, .ant-table');
+        }, { timeout: 300000 }); // Wait up to 5 minutes
 
-        console.log(`📄 Navigating to target page: ${url}`);
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+        console.log('✅ Login detected! Proceeding with scraping...');
+    } else {
+        console.log('✅ Login successful!');
+    }
+} else {
+    console.log('✅ Already logged in (session restored).');
+}
 
-        // Wait a bit for potential redirects
-        await new Promise(resolve => setTimeout(resolve, 5000));
+// Wait for content to load
+console.log(`📜 Scrolling to load more data...`);
+let previousCount = 0;
+let unchangedCount = 0;
+const maxScrollAttempts = 10;
 
-        // Check if we need to log in
-        let needsLogin = await page.evaluate(() => {
-            return location.href.includes('login') || !!document.querySelector('input[type="password"]') || document.title.includes('登录');
-        });
+for (let i = 0; i < maxScrollAttempts; i++) {
+    // Check current API data count
+    const currentApiData = capturedData.filter(item => item.url.includes('getInfoList'));
+    const currentCount = currentApiData.reduce((sum, item) => {
+        return sum + (item.data?.data?.items?.length || 0);
+    }, 0);
 
-        if (needsLogin) {
-            console.log('\n🛑 Authentication required!');
+    console.log(`   Scroll ${i + 1}: Captured ${currentCount} items from ${currentApiData.length} API calls`);
 
-            if (username && password) {
-                console.log('🔄 Attempting automatic login...');
-                await login(page, username, password);
-            } else {
-                // Check if fields are already filled (e.g. by autofill or user)
-                const hasFilledInputs = await page.evaluate(() => {
-                    const user = document.querySelector('input[placeholder*="手机"], input[placeholder*="账号"], input[type="text"]');
-                    const pass = document.querySelector('input[placeholder*="密码"], input[type="password"]');
-                    return user && user.value && pass && pass.value;
-                });
-
-                if (hasFilledInputs) {
-                    console.log('👀 Detected filled login fields. Attempting to click login...');
-                    const submitSelector = '.login-btn, button[type="submit"], .submit';
-                    await page.click(submitSelector);
-                    await new Promise(r => setTimeout(r, 3000)); // Wait for click to register
-                }
-            }
-
-            // Re-check login status
-            needsLogin = await page.evaluate(() => {
-                return location.href.includes('login') || !!document.querySelector('input[type="password"]') || document.title.includes('登录');
-            });
-
-            if (needsLogin) {
-                console.log('⚠️  Automatic login failed or not configured.');
-                console.log('👉 Please manually log in to the website in the opened browser window.');
-                console.log('⏳ Waiting for you to log in and navigate to the data page...');
-
-                // Wait until we are on the target page and table exists
-                await page.waitForFunction(() => {
-                    return !location.href.includes('login') && !document.title.includes('登录') && document.querySelector('table, .el-table, .table-container, .ant-table');
-                }, { timeout: 300000 }); // Wait up to 5 minutes
-
-                console.log('✅ Login detected! Proceeding with scraping...');
-            } else {
-                console.log('✅ Login successful!');
-            }
-        } else {
-            console.log('✅ Already logged in (session restored).');
+    // If no new data in last 2 scrolls, stop
+    if (currentCount === previousCount) {
+        unchangedCount++;
+        if (unchangedCount >= 2) {
+            console.log('   No more new data, stopping scroll');
+            break;
         }
+    } else {
+        unchangedCount = 0;
+    }
+    previousCount = currentCount;
 
-        // Wait for content to load
-        console.log(`⏳ Waiting for table content (checking for "日期")...`);
-        try {
-            await page.waitForFunction(() => {
-                return document.body.innerText.includes('日期');
-            }, { timeout: 30000 });
-            console.log('✅ Table content detected!');
-        } catch (e) {
-            console.log('⚠️  Table content "日期" not found. Checking if we are on login page...');
-            // Double check if we got redirected to login page
-            needsLogin = await page.evaluate(() => {
-                return location.href.includes('login') || !!document.querySelector('input[type="password"]') || document.title.includes('登录');
+    // Scroll to bottom
+    await page.evaluate(() => {
+        window.scrollTo(0, document.body.scrollHeight);
+    });
+
+    // Wait for new data to load
+    await new Promise(resolve => setTimeout(resolve, 2000));
+}
+
+console.log(`✅ Finished scrolling, total API calls captured: ${capturedData.filter(item => item.url.includes('getInfoList')).length}`);
+
+// Save HTML for debugging
+const html = await page.content();
+fs.writeFileSync('page_debug.html', html);
+console.log(`   📄 Saved page HTML to page_debug.html (Length: ${html.length})`);
+
+// Process captured API data
+const data = [];
+const getInfoListResponses = capturedData.filter(item =>
+    item.url.includes('/information/riskMonitor/getInfoList')
+);
+
+console.log(`📊 Processing ${getInfoListResponses.length} API responses...`);
+
+getInfoListResponses.forEach(response => {
+    if (response.data && response.data.data && response.data.data.items) {
+        const items = response.data.data.items;
+        items.forEach(item => {
+            const mainRelated = item.related && item.related.length > 0 ? item.related[0] : {};
+
+            data.push({
+                date: item.date ? item.date.replace(/(\d{4})(\d{2})(\d{2}).*/, '$1-$2-$3') : '',
+                title: item.title || '',
+                summary: mainRelated.shortCompanyName || mainRelated.companyName || '查看',
+                source: item.originalSource || '',
+                related_enterprise: mainRelated.shortCompanyName || mainRelated.companyName || '',
+                importance: mainRelated.importanceABS || '',
+                sentiment: mainRelated.negative === '-1' ? '负面' : (mainRelated.negative === '1' ? '正面' : '中性'),
+                level1_category: item.firstLevelName || '',
+                level2_category: mainRelated.lastLevelName || '',
+                url: item.originalUrl || ''
             });
-
-            if (needsLogin) {
-                console.log('\n🛑 Redirected to login page!');
-                console.log('👉 Please manually log in to the website in the opened browser window.');
-                console.log('⏳ Waiting for you to log in and navigate to the data page...');
-
-                await page.waitForFunction(() => {
-                    return !location.href.includes('login') && !document.title.includes('登录') && document.body.innerText.includes('日期');
-                }, { timeout: 300000 });
-                console.log('✅ Login detected! Proceeding...');
-            } else {
-                console.log('⚠️  Still not found "日期", waiting a bit more...');
-                await new Promise(resolve => setTimeout(resolve, 10000));
-            }
-        }
-
-        // Additional wait for dynamic content to settle
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        // Scroll to load more data (infinite scroll)
-        console.log(`📜 Scrolling to load more data...`);
-        let previousCount = 0;
-        let unchangedCount = 0;
-        const maxScrollAttempts = 10;
-
-        for (let i = 0; i < maxScrollAttempts; i++) {
-            // Check current API data count
-            const currentApiData = capturedData.filter(item => item.url.includes('getInfoList'));
-            const currentCount = currentApiData.reduce((sum, item) => {
-                return sum + (item.data?.data?.items?.length || 0);
-            }, 0);
-
-            console.log(`   Scroll ${i + 1}: Captured ${currentCount} items from ${currentApiData.length} API calls`);
-
-            // If no new data in last 2 scrolls, stop
-            if (currentCount === previousCount) {
-                unchangedCount++;
-                if (unchangedCount >= 2) {
-                    console.log('   No more new data, stopping scroll');
-                    break;
-                }
-            } else {
-                unchangedCount = 0;
-            }
-            previousCount = currentCount;
-
-            // Scroll to bottom
-            await page.evaluate(() => {
-                window.scrollTo(0, document.body.scrollHeight);
-            });
-
-            // Wait for new data to load
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-
-        console.log(`✅ Finished scrolling, total API calls captured: ${capturedData.filter(item => item.url.includes('getInfoList')).length}`);
-
-        // Save HTML for debugging
-        const html = await page.content();
-        fs.writeFileSync('page_debug.html', html);
-        console.log(`   📄 Saved page HTML to page_debug.html (Length: ${html.length})`);
-
-        // Process captured API data
-        const data = [];
-        const getInfoListResponses = capturedData.filter(item =>
-            item.url.includes('/information/riskMonitor/getInfoList')
-        );
-
-        console.log(`📊 Processing ${getInfoListResponses.length} API responses...`);
-
-        getInfoListResponses.forEach(response => {
-            if (response.data && response.data.data && response.data.data.items) {
-                const items = response.data.data.items;
-                items.forEach(item => {
-                    const mainRelated = item.related && item.related.length > 0 ? item.related[0] : {};
-
-                    data.push({
-                        date: item.date ? item.date.replace(/(\d{4})(\d{2})(\d{2}).*/, '$1-$2-$3') : '',
-                        title: item.title || '',
-                        summary: mainRelated.shortCompanyName || mainRelated.companyName || '查看',
-                        source: item.originalSource || '',
-                        related_enterprise: mainRelated.shortCompanyName || mainRelated.companyName || '',
-                        importance: mainRelated.importanceABS || '',
-                        sentiment: mainRelated.negative === '-1' ? '负面' : (mainRelated.negative === '1' ? '正面' : '中性'),
-                        level1_category: item.firstLevelName || '',
-                        level2_category: mainRelated.lastLevelName || '',
-                        url: item.originalUrl || ''
-                    });
-                });
-            }
         });
+    }
+});
 
-        console.log(`✅ Extracted ${data.length} records from API data`);
-        return data;
+console.log(`✅ Extracted ${data.length} records from API data`);
+return data;
 
     } catch (error) {
-        console.error(`❌ Error scraping data: `, error.message);
-        throw error;
-    } finally {
-        await browser.close();
-    }
+    console.error(`❌ Error scraping data: `, error.message);
+    throw error;
+} finally {
+    await browser.close();
+}
 }
 
 /**
