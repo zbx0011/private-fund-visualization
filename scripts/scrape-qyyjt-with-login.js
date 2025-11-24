@@ -74,16 +74,24 @@ async function login(page, username, password) {
 async function scrapeQyyjt(url, username, password) {
     console.log(`🚀 Starting scraper for: ${url}`);
 
+    const isLinux = process.platform === 'linux';
+    const executablePath = isLinux
+        ? '/usr/bin/chromium-browser'
+        : 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+
+    console.log(`   Running on ${process.platform}, using browser: ${executablePath}`);
+
     const browser = await puppeteer.launch({
-        headless: false, // Show browser for manual interaction
-        defaultViewport: null, // Use full window size
-        userDataDir: './user_data', // PERSIST SESSION
-        executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', // USE EDGE
+        headless: isLinux ? true : false, // Headless on VPS, visible on Windows
+        defaultViewport: null,
+        userDataDir: './user_data',
+        executablePath: executablePath,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-blink-features=AutomationControlled',
-            '--start-maximized'
+            '--start-maximized',
+            '--disable-dev-shm-usage' // Fix for low memory in containers
         ]
     });
 
