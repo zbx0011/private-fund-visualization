@@ -1,0 +1,16 @@
+[
+  {
+    "name": "JSESSIONID",
+    "value": "80E08BD1778BF57665FBBCA38ADBA598",
+    "domain": "www.qyyjt.cn",
+    "path": "/",
+    "expires": -1,
+    "size": 42,
+    "httpOnly": true,
+    "secure": false,
+    "session": true,
+    "priority": "Medium",
+    "sameParty": false,
+    "sourceScheme": "Secure"
+  }
+]

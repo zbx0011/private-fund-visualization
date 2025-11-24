@@ -1,0 +1,106 @@
+'use client'
+
+import { useState } from 'react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts'
+import { formatCurrency } from '@/lib/utils'
+
+interface StrategyDistributionChartProps {
+    data: Array<{
+        strategy: string
+        value: number
+        count: number
+    }>
+}
+
+const COLORS = [
+    '#3b82f6', // Blue
+    '#10b981', // Emerald
+    '#f59e0b', // Amber
+    '#8b5cf6', // Violet
+    '#ec4899', // Pink
+    '#06b6d4', // Cyan
+    '#f97316', // Orange
+    '#6366f1', // Indigo
+    '#14b8a6', // Teal
+    '#d946ef', // Fuchsia
+]
+
+const RADIAN = Math.PI / 180
+
+const renderActiveShape = (props: any) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props
+
+    return (
+        <g>
+            <text x={cx} y={cy} dy={-10} textAnchor="middle" fill="#1f2937" className="text-lg font-bold">
+                {payload.strategy}
+            </text>
+            <text x={cx} y={cy} dy={15} textAnchor="middle" fill="#6b7280" className="text-sm">
+                {`${(percent * 100).toFixed(1)}%`}
+            </text>
+            <text x={cx} y={cy} dy={35} textAnchor="middle" fill="#9ca3af" className="text-xs">
+                {formatCurrency(value)}
+            </text>
+            <Sector
+                cx={cx}
+                cy={cy}
+                innerRadius={innerRadius}
+                outerRadius={outerRadius}
+                startAngle={startAngle}
+                endAngle={endAngle}
+                fill={fill}
+            />
+            <Sector
+                cx={cx}
+                cy={cy}
+                startAngle={startAngle}
+                endAngle={endAngle}
+                innerRadius={outerRadius + 6}
+                outerRadius={outerRadius + 10}
+                fill={fill}
+            />
+        </g>
+    )
+}
+
+export function StrategyDistributionChart({ data }: StrategyDistributionChartProps) {
+    const [activeIndex, setActiveIndex] = useState(0)
+
+    const onPieEnter = (_: any, index: number) => {
+        setActiveIndex(index)
+    }
+
+    if (!data || data.length === 0) {
+        return (
+            <div className="h-[300px] flex items-center justify-center text-gray-400">
+                暂无策略分布数据
+            </div>
+        )
+    }
+
+    return (
+        <div className="h-[350px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                    <Pie
+                        activeIndex={activeIndex}
+                        activeShape={renderActiveShape}
+                        data={data}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={80}
+                        outerRadius={110}
+                        fill="#8884d8"
+                        dataKey="value"
+                        onMouseEnter={onPieEnter}
+                        paddingAngle={2}
+                    >
+                        {data.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
+                        ))}
+                    </Pie>
+                </PieChart>
+            </ResponsiveContainer>
+        </div>
+    )
+}
