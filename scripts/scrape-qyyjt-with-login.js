@@ -127,62 +127,6 @@ async function scrapeQyyjt(url, username, password) {
             }
         });
 
-        console.log(`📄 Navigating to target page: ${url}`);
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-
-        // Wait a bit for potential redirects
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        // Check if we need to log in
-        let needsLogin = await page.evaluate(() => {
-            return location.href.includes('login') || !!document.querySelector('input[type="password"]') || document.title.includes('登录');
-        });
-
-        if (needsLogin) {
-            console.log('\n🛑 Authentication required!');
-
-            if (username && password) {
-                console.log('🔄 Attempting automatic login...');
-                await login(page, username, password);
-            } else {
-                // Check if fields are already filled (e.g. by autofill or user)
-                const hasFilledInputs = await page.evaluate(() => {
-                    const user = document.querySelector('input[placeholder*="手机"], input[placeholder*="账号"], input[type="text"]');
-                    const pass = document.querySelector('input[placeholder*="密码"], input[type="password"]');
-                    return user && user.value && pass && pass.value;
-                });
-
-                if (hasFilledInputs) {
-                    console.log('👀 Detected filled login fields. Attempting to click login...');
-                    const submitSelector = '.login-btn, button[type="submit"], .submit';
-                    await page.click(submitSelector);
-                    await new Promise(r => setTimeout(r, 3000)); // Wait for click to register
-                }
-            }
-
-            // Re-check login status
-            needsLogin = await page.evaluate(() => {
-                return location.href.includes('login') || !!document.querySelector('input[type="password"]') || document.title.includes('登录');
-            });
-
-            if (needsLogin) {
-                console.log('⚠️  Automatic login failed or not configured.');
-                console.log('👉 Please manually log in to the website in the opened browser window.');
-                console.log('⏳ Waiting for you to log in and navigate to the data page...');
-
-                // Wait until we are on the target page and table exists
-                await page.waitForFunction(() => {
-                    return !location.href.includes('login') && !document.title.includes('登录') && document.querySelector('table, .el-table, .table-container, .ant-table');
-                }, { timeout: 300000 }); // Wait up to 5 minutes
-
-                console.log('✅ Login detected! Proceeding with scraping...');
-            } else {
-                console.log('✅ Login successful!');
-            }
-        } else {
-            console.log('✅ Already logged in (session restored).');
-        }
-
         // Wait for content to load
         console.log(`📜 Scrolling to load more data...`);
         let previousCount = 0;
