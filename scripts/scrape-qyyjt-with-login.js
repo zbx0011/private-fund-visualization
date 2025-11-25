@@ -127,7 +127,96 @@ async function scrapeQyyjt(url, username, password) {
             }
         });
 
+        console.log(`📄 Navigating to target page: ${url}`);
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+
+        // Wait a bit for potential redirects
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // Check if we need to log in
+        let needsLogin = await page.evaluate(() => {
+            return location.href.includes('login') ||
+                !!document.querySelector('.login-container') ||
+                document.title.includes('登录');
+        });
+
+        if (needsLogin) {
+            console.log('\n🛑 Authentication required!');
+
+            if (username && password) {
+                console.log('🔄 Attempting automatic login...');
+
+                // Try to find and click the "Account Password Login" tab
+                try {
+                    const tabs = await page.$x("//div[contains(text(), '账号密码登录')] | //span[contains(text(), '账号密码登录')]");
+                    if (tabs.length > 0) {
+                        console.log('   Clicking "Account Password Login" tab...');
+                        await tabs[0].click();
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                } catch (e) {
+                    console.log('   ⚠️ Could not find password login tab');
+                }
+
+                // Enter credentials
+                await login(page, username, password);
+
+                // Wait for redirect
+                await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => { });
+
+            } else {
+                console.log('👉 Please manually log in in the browser window.');
+                console.log('⏳ Waiting for you to log in...');
+            }
+
+            // Re-check login status
+            needsLogin = await page.evaluate(() => {
+                return location.href.includes('login') || document.title.includes('登录');
+            });
+
+            if (needsLogin) {
+                console.log('⚠️  Automatic login failed. Please manually log in.');
+                // Wait for manual login
+                await page.waitForFunction(() => {
+                    return !location.href.includes('login') && !document.title.includes('登录');
+                }, { timeout: 300000 });
+                console.log('✅ Login detected!');
+            } else {
+                console.log('✅ Login successful!');
+            }
+
+            // Give it a moment to fully load
+            await new Promise(resolve => setTimeout(resolve, 5000));
+        } else {
+            console.log('✅ Already logged in (session restored).');
+        }
+
         // Wait for content to load
+        console.log(`⏳ Waiting for table content (checking for "日期")...`);
+        try {
+            // Wait for the table to actually appear
+            await page.waitForFunction(() => {
+                const text = document.body.innerText;
+                return text.includes('日期') || text.includes('发布时间') || !!document.querySelector('.el-table__body');
+            }, { timeout: 60000 });
+
+            console.log('✅ Table content detected!');
+
+            // Wait for network to be idle to ensure data is loaded
+            await page.waitForNetworkIdle({ idleTime: 2000, timeout: 30000 }).catch(() => { });
+
+        } catch (e) {
+            console.log('⚠️  Table content not found or timeout.');
+            console.log(`   Current URL: ${page.url()}`);
+            const title = await page.title();
+            console.log(`   Current Title: ${title}`);
+
+            // Take screenshot for debug
+            await page.screenshot({ path: 'debug_failed_load.png' });
+            console.log('   📸 Saved screenshot to debug_failed_load.png');
+        }
+
+        // Scroll to load more data (infinite scroll)
         console.log(`📜 Scrolling to load more data...`);
         let previousCount = 0;
         let unchangedCount = 0;
