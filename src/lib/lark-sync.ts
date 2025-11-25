@@ -151,6 +151,7 @@ export class LarkSyncService {
       result.errors.push(`同步流程失败: ${error}`)
     }
 
+
     return result
   }
 
@@ -220,12 +221,23 @@ export class LarkSyncService {
   private async findExistingFund(db: any, name: string, manager: string): Promise<any> {
     return new Promise((resolve, reject) => {
       const dbInstance = (db as any).db
-      dbInstance.get(
-        'SELECT id FROM funds WHERE name = ? AND (manager = ? OR manager IS NULL)',
-        [name, manager || ''],
-        (err: Error | null, row: any) => {
-          if (err) reject(err)
-          else resolve(row)
+
+      // 首先尝试通过名称查找
+      dbInstance.all(
+        'SELECT id, manager FROM funds WHERE name = ?',
+        [name],
+        (err: Error | null, rows: any[]) => {
+          if (err) { reject(err); return }
+          if (rows.length === 0) { resolve(null); return }
+          if (rows.length === 1) { resolve(rows[0]); return }
+
+          const exactMatch = rows.find(r => r.manager === manager)
+          if (exactMatch) { resolve(exactMatch); return }
+
+          const unknownManager = rows.find(r => !r.manager || r.manager === '未知')
+          if (unknownManager) { resolve(unknownManager); return }
+
+          resolve(rows[0])
         }
       )
     })
@@ -268,7 +280,7 @@ export class LarkSyncService {
       addField('cost', fund.cost)
       addField('scale', fund.scale)
       addField('weekly_return', fund.weeklyReturn)
-      addField('yearly_return', fund.yearlyReturn)  // ADD THIS LINE
+      addField('yearly_return', fund.yearlyReturn)
       addField('daily_return', fund.dailyReturn)
       addField('daily_pnl', fund.dailyPnl)
       addField('concentration', fund.concentration)
@@ -587,6 +599,7 @@ export class LarkSyncService {
       })
     })
   }
+
   /**
    * 更新基金指标
    */
@@ -618,7 +631,12 @@ export class LarkSyncService {
     if (typeof value === 'number') {
       // 时间戳（毫秒）
       const date = new Date(value)
-      return date.toISOString().split('T')[0]
+      // 使用本地时间（假设服务器运行在UTC+8或需要强制UTC+8）
+      // 飞书返回的时间戳通常是UTC+8的0点对应的UTC时间
+      // 我们需要将其转换为UTC+8的日期字符串
+      const offset = 8 * 60 * 60 * 1000 // UTC+8
+      const localDate = new Date(date.getTime() + offset)
+      return localDate.toISOString().split('T')[0]
     }
 
     if (typeof value === 'string') {

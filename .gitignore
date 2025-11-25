@@ -50,3 +50,5 @@ data/*.json
 # Debug artifacts
 page_debug.html
 debug_failed_load.png
+backups/
+nul

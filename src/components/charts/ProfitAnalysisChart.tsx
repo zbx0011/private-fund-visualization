@@ -106,8 +106,15 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
             // Format date to show only YYYY-MM-DD
             const formatDate = (dateStr: string) => {
                 if (!dateStr) return ''
+                // If it looks like YYYY-MM-DD, return it directly
+                if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr
+
                 const date = new Date(dateStr)
-                return date.toISOString().split('T')[0]
+                // Use local time (Beijing Time)
+                const year = date.getFullYear()
+                const month = String(date.getMonth() + 1).padStart(2, '0')
+                const day = String(date.getDate()).padStart(2, '0')
+                return `${year}-${month}-${day}`
             }
             return (
                 <div style={{

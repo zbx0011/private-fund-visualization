@@ -16,7 +16,7 @@ const fs = require('fs');
 
 // Configuration
 const EDGE_PATH = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
-const USER_DATA_DIR = "C:\\Users\\diffzhou\\AppData\\Local\\Microsoft\\Edge\\User Data";
+const USER_DATA_DIR = path.join(process.env.LOCALAPPDATA, 'Microsoft', 'Edge', 'User Data');
 
 const dbPath = path.join(__dirname, '..', 'data', 'funds.db');
 const db = new Database(dbPath);
