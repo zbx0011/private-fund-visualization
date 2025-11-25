@@ -1,0 +1,20 @@
+[dotenv@17.2.3] injecting env (2) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+
+========================================
+  企业预警通 Data Scraper (with Login)
+========================================
+
+🚀 Starting scraper for: https://www.qyyjt.cn/combination/20250603164207
+🔄 Navigating to homepage to login...
+🔑 Logging in as 15622266864...
+❌ Login failed:  Waiting for selector `input[placeholder*="手机"], input[placeholder*="账号"], input[type="text"]` failed
+📄 Loading target page: https://www.qyyjt.cn/combination/20250603164207
+   📄 Saved page HTML to page_debug.html
+⏳ Waiting for table to load...
+⚠️  Table selector not found, trying alternative selectors...
+📊 Extracting data...
+   📸 Screenshot saved to page-screenshot.png
+✅ Extracted 0 records
+
+⚠️  No records found.
+   Check page-screenshot.png to debug

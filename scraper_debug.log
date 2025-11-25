@@ -1,0 +1,16 @@
+[dotenv@17.2.3] injecting env (2) from .env -- tip: ⚙️  override existing env vars with { override: true }
+
+========================================
+  企业预警通 Data Scraper (with Login)
+========================================
+
+🚀 Starting scraper for: https://www.qyyjt.cn/combination/20250603164207
+📄 Loading target page...
+⏳ Waiting for table to load...
+⚠️  Table selector not found, trying alternative selectors...
+📊 Extracting data...
+   📸 Screenshot saved to page-screenshot.png
+✅ Extracted 0 records
+
+⚠️  No records found.
+   Check page-screenshot.png to debug
