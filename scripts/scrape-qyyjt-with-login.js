@@ -47,14 +47,20 @@ async function login(page, username, password) {
         await page.type(usernameSelector, username);
         await page.type(passwordSelector, password);
 
-        // Click the login button using XPath to be more robust
-        const loginButtons = await page.$x("//button[contains(., '登录')]");
-        if (loginButtons.length > 0) {
-            await loginButtons[0].click();
-        } else {
-            // Fallback to CSS selector
-            await page.click('.login-btn, button[type="submit"], .submit');
-        }
+        // Click the login button using evaluate to be robust against selector issues
+        await page.evaluate(() => {
+            // Try to find button with text "登录"
+            const buttons = Array.from(document.querySelectorAll('button, .btn, .submit'));
+            const loginBtn = buttons.find(b => b.textContent.includes('登录'));
+
+            if (loginBtn) {
+                loginBtn.click();
+            } else {
+                // Fallback to standard selectors
+                const fallback = document.querySelector('.login-btn, button[type="submit"], .submit');
+                if (fallback) fallback.click();
+            }
+        });
 
         console.log('   ✓ Submitted login form');
 
@@ -154,11 +160,22 @@ async function scrapeQyyjt(url, username, password) {
 
                 // Try to find and click the "Account Password Login" tab
                 try {
-                    // Corrected text: 账户 (Account) instead of 账号 (Account Number)
-                    const tabs = await page.$x("//div[contains(text(), '账户密码登录')] | //span[contains(text(), '账户密码登录')] | //div[contains(text(), '账号密码登录')]");
-                    if (tabs.length > 0) {
+                    const clicked = await page.evaluate(() => {
+                        const targets = ['账户密码登录', '账号密码登录'];
+                        // Find all divs and spans
+                        const elements = Array.from(document.querySelectorAll('div, span'));
+                        for (const el of elements) {
+                            // Check if text content matches and element is visible
+                            if (targets.some(t => el.textContent.trim() === t) || targets.some(t => el.textContent.includes(t))) {
+                                el.click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    });
+
+                    if (clicked) {
                         console.log('   Clicking "Account Password Login" tab...');
-                        await tabs[0].click();
                         await new Promise(r => setTimeout(r, 1000));
                     } else {
                         console.log('   ⚠️ Could not find "Account Password Login" tab (selector mismatch?)');
