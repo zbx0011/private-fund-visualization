@@ -41,14 +41,20 @@ async function login(page, username, password) {
         // Wait for inputs
         const usernameSelector = 'input[placeholder*="手机"], input[placeholder*="账号"], input[type="text"]';
         const passwordSelector = 'input[placeholder*="密码"], input[type="password"]';
-        const submitSelector = '.login-btn, button[type="submit"], .submit';
 
         await page.waitForSelector(usernameSelector, { timeout: 10000 });
 
         await page.type(usernameSelector, username);
         await page.type(passwordSelector, password);
 
-        await page.click(submitSelector);
+        // Click the login button using XPath to be more robust
+        const loginButtons = await page.$x("//button[contains(., '登录')]");
+        if (loginButtons.length > 0) {
+            await loginButtons[0].click();
+        } else {
+            // Fallback to CSS selector
+            await page.click('.login-btn, button[type="submit"], .submit');
+        }
 
         console.log('   ✓ Submitted login form');
 
