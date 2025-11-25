@@ -154,14 +154,17 @@ async function scrapeQyyjt(url, username, password) {
 
                 // Try to find and click the "Account Password Login" tab
                 try {
-                    const tabs = await page.$x("//div[contains(text(), '账号密码登录')] | //span[contains(text(), '账号密码登录')]");
+                    // Corrected text: 账户 (Account) instead of 账号 (Account Number)
+                    const tabs = await page.$x("//div[contains(text(), '账户密码登录')] | //span[contains(text(), '账户密码登录')] | //div[contains(text(), '账号密码登录')]");
                     if (tabs.length > 0) {
                         console.log('   Clicking "Account Password Login" tab...');
                         await tabs[0].click();
                         await new Promise(r => setTimeout(r, 1000));
+                    } else {
+                        console.log('   ⚠️ Could not find "Account Password Login" tab (selector mismatch?)');
                     }
                 } catch (e) {
-                    console.log('   ⚠️ Could not find password login tab');
+                    console.log('   ⚠️ Error clicking password login tab:', e.message);
                 }
 
                 // Enter credentials
