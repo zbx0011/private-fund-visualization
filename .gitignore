@@ -1,71 +1,52 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Dependencies
+node_modules
+.pnp
+.pnp.js
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Testing
+.coverage
+.env.test.local
+.env.test
 
-# testing
-/coverage
+# Next.js
+.next/
+out/
 
-# next.js
-/.next/
-/out/
+# Production
+build
 
-# production
-/build
-
-# misc
+# Misc
 .DS_Store
 *.pem
 
-# debug
+# Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# Local Env Files
+.env*.local
 
-# vercel
+# Vercel
 .vercel
 
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
-# database
-data/
+# User Data (Edge Profile)
+user_data/
+user_data_v2/
+user_data_v3/
+user_data_v4/
+
+# Database
+data/*.db
+data/*.json
 *.db
 *.sqlite
 *.sqlite3
 
-# logs and debug files
-*.log
-sync-debug.txt
-sync-output.txt
-debug-*.js
-test-*.js
-test_data.json
-api_test.json
-api_response.json
-feishu-sample.json
-chat_log_*.md
-
-# Chinese filename markdown files
-*.md
-!README.md
-!DEPLOYMENT.md
-!GITHUB_SETUP.md
-!VPS_DEPLOYMENT.md
-!SCRAPER_USAGE.md
-
-
-
-
+# Debug artifacts
+page_debug.html
+debug_failed_load.png

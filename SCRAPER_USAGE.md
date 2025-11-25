@@ -38,3 +38,17 @@ crontab -e
 - **No data**: Check URL and table selectors
 - **Blocked**: Add delays between requests
 - **暂无数据**: Run scraper first to populate database
+
+## Using Your Edge Account (Advanced)
+
+If the website requires login or complex authentication, you can use your own Edge browser profile.
+
+1. **Close all Edge windows** completely.
+2. Run the scraper with your profile:
+
+```bash
+node scripts/scrape-with-edge-profile.js "https://example.com/monitor"
+```
+
+This will launch Edge with your bookmarks, cookies, and login sessions.
+

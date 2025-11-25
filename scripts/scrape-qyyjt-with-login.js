@@ -47,20 +47,55 @@ async function login(page, username, password) {
         await page.type(usernameSelector, username);
         await page.type(passwordSelector, password);
 
-        // Click the login button using evaluate to be robust against selector issues
+        // Check for "User Agreement" checkbox and check it if needed
         await page.evaluate(() => {
-            // Try to find button with text "登录"
-            const buttons = Array.from(document.querySelectorAll('button, .btn, .submit'));
-            const loginBtn = buttons.find(b => b.textContent.includes('登录'));
-
-            if (loginBtn) {
-                loginBtn.click();
-            } else {
-                // Fallback to standard selectors
-                const fallback = document.querySelector('.login-btn, button[type="submit"], .submit');
-                if (fallback) fallback.click();
+            const checkbox = document.querySelector('input[type="checkbox"]');
+            if (checkbox && !checkbox.checked) {
+                checkbox.click();
+                if (checkbox.parentElement) checkbox.parentElement.click();
+            }
+            const labels = Array.from(document.querySelectorAll('label, span, div'));
+            const agreementLabel = labels.find(el => el.textContent.includes('阅读并同意') || el.textContent.includes('协议'));
+            if (agreementLabel && !agreementLabel.querySelector('input:checked')) {
+                agreementLabel.click();
             }
         });
+        console.log('   ✓ Checked User Agreement (if present)');
+
+        // Submit by pressing Enter in the password field
+        console.log('   ⌨️  Pressing Enter to submit...');
+        await page.keyboard.press('Enter');
+        
+        // Wait a bit to see if it works
+        await new Promise(r => setTimeout(r, 2000));
+
+        // If still here, try clicking the button
+        const stillLogin = await page.evaluate(() => location.href.includes('login'));
+        if (stillLogin) {
+            console.log('   ⚠️  Enter key didn\'t work, trying to click login button...');
+            
+            const loginBtnHandle = await page.evaluateHandle(() => {
+                // Find button specifically in the active form if possible, or just the main login button
+                const buttons = Array.from(document.querySelectorAll('button, .btn, .submit, div[role="button"]'));
+                // Filter for visible buttons with "登录" text
+                return buttons.find(b => {
+                    const style = window.getComputedStyle(b);
+                    return b.textContent.includes('登录') && style.display !== 'none' && style.visibility !== 'hidden' && b.offsetParent !== null;
+                });
+            });
+
+            if (loginBtnHandle.asElement()) {
+                await loginBtnHandle.asElement().click();
+                console.log('   🖱️  Clicked login button');
+            } else {
+                 // Fallback to standard selectors
+                 await page.evaluate(() => {
+                     const fallback = document.querySelector('.login-btn, button[type="submit"], .submit');
+                     if (fallback) fallback.click();
+                 });
+                 console.log('   🖱️  Clicked login button (fallback)');
+            }
+        }
 
         console.log('   ✓ Submitted login form');
 
@@ -128,7 +163,11 @@ async function scrapeQyyjt(url, username, password) {
                         // Check if this JSON looks like our data
                         // Look for known keywords or structure
                         const str = JSON.stringify(json);
-                        if (str.includes('新闻') || str.includes('公告') || str.includes('list')) {
+                        // Capture getInfoList (News) and any other list-like data
+                        if (request.url().includes('getInfoList') || 
+                            request.url().includes('statistics') || 
+                            (json.data && json.data.items) ||
+                            (json.items)) {
                             console.log(`📡 Captured API response from: ${request.url()}`);
                             capturedData.push({ url: request.url(), data: json });
                         }
@@ -159,30 +198,75 @@ async function scrapeQyyjt(url, username, password) {
                 console.log('🔄 Attempting automatic login...');
 
                 // Try to find and click the "Account Password Login" tab
+                console.log('   🔍 Looking for "Account Password Login" tab...');
+                
                 try {
-                    const clicked = await page.evaluate(() => {
+                    // 1. Attempt to find and click the tab
+                    const switchResult = await page.evaluate(() => {
+                        // Find all elements containing the text
                         const targets = ['账户密码登录', '账号密码登录'];
-                        // Find all divs and spans
-                        const elements = Array.from(document.querySelectorAll('div, span'));
-                        for (const el of elements) {
-                            // Check if text content matches and element is visible
-                            if (targets.some(t => el.textContent.trim() === t) || targets.some(t => el.textContent.includes(t))) {
-                                el.click();
-                                return true;
+                        const allElements = Array.from(document.querySelectorAll('*')); // Get ALL elements
+                        
+                        // Filter for elements that directly contain the text (leaf nodes or close to leaf)
+                        const candidates = allElements.filter(el => {
+                            const text = el.textContent.trim();
+                            return targets.includes(text) && el.children.length === 0; // Prefer leaf nodes
+                        });
+
+                        if (candidates.length > 0) {
+                            // Sort by visibility or position if needed, but taking the first visible one is usually good
+                            const target = candidates[0];
+                            
+                            // Highlight for debug
+                            target.style.border = '3px solid red';
+                            target.style.backgroundColor = 'yellow';
+                            
+                            // Click the element
+                            target.click();
+                            
+                            // Also try clicking parent (often the tab is an LI or DIV wrapping the text)
+                            if (target.parentElement) {
+                                target.parentElement.click();
                             }
+                            
+                            return { found: true, text: target.textContent, tag: target.tagName };
                         }
-                        return false;
+                        
+                        return { found: false };
                     });
 
-                    if (clicked) {
-                        console.log('   Clicking "Account Password Login" tab...');
+                    if (switchResult.found) {
+                        console.log(`   🖱️  Clicked element "${switchResult.text}" (${switchResult.tag})`);
+                        
+                        // Wait for UI update
                         await new Promise(r => setTimeout(r, 1000));
+                        
+                        // Take a debug screenshot to see if it switched
+                        await page.screenshot({ path: 'debug_tab_switch.png' });
+                        console.log('   📸 Saved screenshot to debug_tab_switch.png');
+
+                        // Check if password input is visible
+                        const passwordInput = await page.$('input[type="password"]');
+                        if (passwordInput) {
+                            console.log('   ✅ Password input appeared!');
+                        } else {
+                            console.log('   ⚠️ Password input NOT found. Trying fallback click...');
+                            
+                            // Fallback: Try clicking by coordinates or using a broader selector
+                            await page.evaluate(() => {
+                                const el = document.querySelector('.login-tab-item:nth-child(2)'); // Guessing class
+                                if (el) el.click();
+                            });
+                        }
                     } else {
-                        console.log('   ⚠️ Could not find "Account Password Login" tab (selector mismatch?)');
+                        console.log('   ⚠️ Could not find "Account Password Login" tab element');
                     }
                 } catch (e) {
-                    console.log('   ⚠️ Error clicking password login tab:', e.message);
+                    console.log('   ⚠️ Error handling login tab:', e.message);
                 }
+
+                // Wait a bit before typing
+                await new Promise(r => setTimeout(r, 1000));
 
                 // Enter credentials
                 await login(page, username, password);
@@ -201,7 +285,33 @@ async function scrapeQyyjt(url, username, password) {
             });
 
             if (needsLogin) {
-                console.log('⚠️  Automatic login failed. Please manually log in.');
+                console.log('⚠️  Automatic login failed (still on login page).');
+
+                // Check for error messages
+                const errorMsg = await page.evaluate(() => {
+                    const el = document.querySelector('.el-form-item__error, .error-msg, .login-error, .msg-error');
+                    return el ? el.textContent.trim() : null;
+                });
+
+                if (errorMsg) {
+                    console.log(`❌ Login Error Message Detected: "${errorMsg}"`);
+                }
+
+                // Check for captcha
+                const captchaDetected = await page.evaluate(() => {
+                    return !!document.querySelector('.geetest_widget') ||
+                        !!document.querySelector('.geetest_radar_tip') ||
+                        !!document.querySelector('iframe[src*="captcha"]');
+                });
+                if (captchaDetected) {
+                    console.log('❌ Captcha detected! Automatic login cannot proceed.');
+                }
+
+                // Take screenshot
+                await page.screenshot({ path: 'debug_login_failed.png' });
+                console.log('   📸 Saved screenshot to debug_login_failed.png');
+
+                console.log('👉 Please manually log in in the browser window.');
                 // Wait for manual login
                 await page.waitForFunction(() => {
                     return !location.href.includes('login') && !document.title.includes('登录');
@@ -269,16 +379,100 @@ async function scrapeQyyjt(url, username, password) {
             }
             previousCount = currentCount;
 
-            // Scroll to bottom
+            // Scroll to bottom - try both window and specific table wrapper
             await page.evaluate(() => {
                 window.scrollTo(0, document.body.scrollHeight);
+                const tableWrapper = document.querySelector('.el-table__body-wrapper');
+                if (tableWrapper) {
+                    tableWrapper.scrollTop = tableWrapper.scrollHeight;
+                }
             });
 
             // Wait for new data to load
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 3000));
         }
 
-        console.log(`✅ Finished scrolling, total API calls captured: ${capturedData.filter(item => item.url.includes('getInfoList')).length}`);
+        console.log(`✅ Finished scrolling "Latest News".`);
+
+        // --- PART 2: Switch to "Statistics by Company" (按公司统计) ---
+        console.log('\n🔄 Switching to "Statistics by Company" (按公司统计)...');
+        
+        try {
+            const switched = await page.evaluate(() => {
+                const tabs = Array.from(document.querySelectorAll('div, span, li, a'));
+                const companyTab = tabs.find(el => el.textContent.trim() === '按公司统计');
+                if (companyTab) {
+                    companyTab.click();
+                    return true;
+                }
+                return false;
+            });
+
+            if (switched) {
+                console.log('   ✅ Clicked "Statistics by Company" tab');
+                await new Promise(r => setTimeout(r, 3000)); // Wait for tab switch
+                
+                // Select "近1月" (Recent 1 month) filter
+                console.log('   🔽 Selecting "近1月" time filter...');
+                try {
+                    const filterSelected = await page.evaluate(() => {
+                        // Find the dropdown/select for time filter
+                        const dropdowns = Array.from(document.querySelectorAll('input, div, span'));
+                        const timeFilter = dropdowns.find(el => 
+                            el.textContent.includes('近1月') || 
+                            el.textContent.includes('近1月')  ||
+                            el.getAttribute('placeholder')?.includes('时间')
+                        );
+                        
+                        if (timeFilter) {
+                            timeFilter.click();
+                            return { clicked: true, type: '找到下拉框' };
+                        }
+                        return { clicked: false };
+                    });
+
+                    if (filterSelected.clicked) {
+                        console.log(`   ✅ Clicked time filter dropdown`);
+                        await new Promise(r => setTimeout(r, 500));
+                        
+                        // Click "近1月" option
+                        await page.evaluate(() => {
+                            const options = Array.from(document.querySelectorAll('li, div, span'));
+                            const oneMonth = options.find(el => el.textContent.trim() === '近1月');
+                            if (oneMonth) {
+                                oneMonth.click();
+                            }
+                        });
+                        console.log('   ✅ Selected "近1月" filter');
+                        await new Promise(r => setTimeout(r, 3000)); // Wait for data reload
+                    } else {
+                        console.log('   ⚠️ Time filter dropdown not found, continuing anyway...');
+                    }
+                } catch (e) {
+                    console.log('   ⚠️ Error selecting time filter:', e.message);
+                }
+                
+                // Scroll Company Statistics view
+                console.log('   📜 Scrolling "Statistics by Company" view...');
+                for (let i = 0; i < 5; i++) {
+                    await page.evaluate(() => {
+                        window.scrollTo(0, document.body.scrollHeight);
+                        const tableWrapper = document.querySelector('.el-table__body-wrapper');
+                        if (tableWrapper) {
+                            tableWrapper.scrollTop = tableWrapper.scrollHeight;
+                        }
+                    });
+                    console.log(`   Scroll ${i + 1}/5 on Company Statistics...`);
+                    await new Promise(r => setTimeout(r, 2000));
+                }
+            } else {
+                console.log('   ⚠️ Could not find "Statistics by Company" tab');
+            }
+        } catch (e) {
+            console.log('   ⚠️ Error switching tabs:', e.message);
+        }
+
+        console.log(`✅ Finished scrolling all tabs, total API calls captured: ${capturedData.filter(item => item.url.includes('getInfoList')).length}`);
 
         // Save HTML for debugging
         const html = await page.content();
@@ -286,31 +480,61 @@ async function scrapeQyyjt(url, username, password) {
         console.log(`   📄 Saved page HTML to page_debug.html (Length: ${html.length})`);
 
         // Process captured API data
-        const data = [];
-        const getInfoListResponses = capturedData.filter(item =>
-            item.url.includes('/information/riskMonitor/getInfoList')
-        );
+        // We process ALL captured data that looks like it has items
+        console.log(`📊 Processing ${capturedData.length} captured API responses...`);
+        
+        // Save captured data to file for debugging
+        fs.writeFileSync('captured_data.json', JSON.stringify(capturedData, null, 2));
+        console.log(`   📄 Saved captured API data to captured_data.json`);
+        
+        const data = []; // Initialize data array
 
-        console.log(`📊 Processing ${getInfoListResponses.length} API responses...`);
+        capturedData.forEach(response => {
+            let items = [];
+            
+            // Format 1: data.data.items (Standard API)
+            if (response.data && response.data.data && Array.isArray(response.data.data.items)) {
+                items = response.data.data.items;
+            } 
+            // Format 2: data.items (Some APIs)
+            else if (response.data && Array.isArray(response.data.items)) {
+                items = response.data.items;
+            }
+            // Format 3: Direct array
+            else if (Array.isArray(response.data)) {
+                items = response.data;
+            }
 
-        getInfoListResponses.forEach(response => {
-            if (response.data && response.data.data && response.data.data.items) {
-                const items = response.data.data.items;
+            if (items.length > 0) {
+                console.log(`   Found ${items.length} items in ${response.url}`);
+                
                 items.forEach(item => {
+                    // Try to extract fields based on common patterns
                     const mainRelated = item.related && item.related.length > 0 ? item.related[0] : {};
-
-                    data.push({
-                        date: item.date ? item.date.replace(/(\d{4})(\d{2})(\d{2}).*/, '$1-$2-$3') : '',
-                        title: item.title || '',
-                        summary: mainRelated.shortCompanyName || mainRelated.companyName || '查看',
-                        source: item.originalSource || '',
-                        related_enterprise: mainRelated.shortCompanyName || mainRelated.companyName || '',
-                        importance: mainRelated.importanceABS || '',
-                        sentiment: mainRelated.negative === '-1' ? '负面' : (mainRelated.negative === '1' ? '正面' : '中性'),
-                        level1_category: item.firstLevelName || '',
-                        level2_category: mainRelated.lastLevelName || '',
-                        url: item.originalUrl || ''
-                    });
+                    
+                    // Determine fields based on available data
+                    const date = item.date || item.publishDate || item.updateTime || '';
+                    const title = item.title || item.companyName || ''; // Company stats might use companyName as title
+                    const summary = item.summary || mainRelated.shortCompanyName || mainRelated.companyName || '查看';
+                    const source = item.originalSource || item.source || '企业预警通';
+                    const related = mainRelated.shortCompanyName || mainRelated.companyName || item.companyName || '';
+                    
+                    // Only add if we have at least a date and title/related
+                    if (date && (title || related)) {
+                        data.push({
+                            date: date.replace(/(\d{4})(\d{2})(\d{2}).*/, '$1-$2-$3'),
+                            title: title,
+                            summary: summary,
+                            source: source,
+                            related_enterprise: related,
+                            importance: mainRelated.importanceABS || item.importance || '一般',
+                            sentiment: (mainRelated.negative === '-1' || item.negative === '-1') ? '负面' : 
+                                      ((mainRelated.negative === '1' || item.negative === '1') ? '正面' : '中性'),
+                            level1_category: item.firstLevelName || item.eventType || '',
+                            level2_category: mainRelated.lastLevelName || item.subEventType || '',
+                            url: item.originalUrl || ''
+                        });
+                    }
                 });
             }
         });
