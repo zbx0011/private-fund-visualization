@@ -1,3 +1,2 @@
-2025/11/25-11:43:52.224 a880 Reusing MANIFEST E:\私募可视化\private-fund-visualization\user_data\Default\Service Worker\Database/MANIFEST-000001
-2025/11/25-11:43:52.224 a880 Recovering log #3
-2025/11/25-11:43:52.224 a880 Reusing old log E:\私募可视化\private-fund-visualization\user_data\Default\Service Worker\Database/000003.log 
+2025/11/26-15:33:11.470 b304 Creating DB E:\项目\私募可视化\private-fund-visualization\user_data\Default\Service Worker\Database since it was missing.
+2025/11/26-15:33:11.492 b304 Reusing MANIFEST E:\项目\私募可视化\private-fund-visualization\user_data\Default\Service Worker\Database/MANIFEST-000001

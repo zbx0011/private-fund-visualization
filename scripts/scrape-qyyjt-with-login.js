@@ -65,7 +65,7 @@ async function login(page, username, password) {
         // Submit by pressing Enter in the password field
         console.log('   ⌨️  Pressing Enter to submit...');
         await page.keyboard.press('Enter');
-        
+
         // Wait a bit to see if it works
         await new Promise(r => setTimeout(r, 2000));
 
@@ -73,7 +73,7 @@ async function login(page, username, password) {
         const stillLogin = await page.evaluate(() => location.href.includes('login'));
         if (stillLogin) {
             console.log('   ⚠️  Enter key didn\'t work, trying to click login button...');
-            
+
             const loginBtnHandle = await page.evaluateHandle(() => {
                 // Find button specifically in the active form if possible, or just the main login button
                 const buttons = Array.from(document.querySelectorAll('button, .btn, .submit, div[role="button"]'));
@@ -88,12 +88,12 @@ async function login(page, username, password) {
                 await loginBtnHandle.asElement().click();
                 console.log('   🖱️  Clicked login button');
             } else {
-                 // Fallback to standard selectors
-                 await page.evaluate(() => {
-                     const fallback = document.querySelector('.login-btn, button[type="submit"], .submit');
-                     if (fallback) fallback.click();
-                 });
-                 console.log('   🖱️  Clicked login button (fallback)');
+                // Fallback to standard selectors
+                await page.evaluate(() => {
+                    const fallback = document.querySelector('.login-btn, button[type="submit"], .submit');
+                    if (fallback) fallback.click();
+                });
+                console.log('   🖱️  Clicked login button (fallback)');
             }
         }
 
@@ -164,8 +164,8 @@ async function scrapeQyyjt(url, username, password) {
                         // Look for known keywords or structure
                         const str = JSON.stringify(json);
                         // Capture getInfoList (News) and any other list-like data
-                        if (request.url().includes('getInfoList') || 
-                            request.url().includes('statistics') || 
+                        if (request.url().includes('getInfoList') ||
+                            request.url().includes('statistics') ||
                             (json.data && json.data.items) ||
                             (json.items)) {
                             console.log(`📡 Captured API response from: ${request.url()}`);
@@ -199,14 +199,14 @@ async function scrapeQyyjt(url, username, password) {
 
                 // Try to find and click the "Account Password Login" tab
                 console.log('   🔍 Looking for "Account Password Login" tab...');
-                
+
                 try {
                     // 1. Attempt to find and click the tab
                     const switchResult = await page.evaluate(() => {
                         // Find all elements containing the text
                         const targets = ['账户密码登录', '账号密码登录'];
                         const allElements = Array.from(document.querySelectorAll('*')); // Get ALL elements
-                        
+
                         // Filter for elements that directly contain the text (leaf nodes or close to leaf)
                         const candidates = allElements.filter(el => {
                             const text = el.textContent.trim();
@@ -216,31 +216,31 @@ async function scrapeQyyjt(url, username, password) {
                         if (candidates.length > 0) {
                             // Sort by visibility or position if needed, but taking the first visible one is usually good
                             const target = candidates[0];
-                            
+
                             // Highlight for debug
                             target.style.border = '3px solid red';
                             target.style.backgroundColor = 'yellow';
-                            
+
                             // Click the element
                             target.click();
-                            
+
                             // Also try clicking parent (often the tab is an LI or DIV wrapping the text)
                             if (target.parentElement) {
                                 target.parentElement.click();
                             }
-                            
+
                             return { found: true, text: target.textContent, tag: target.tagName };
                         }
-                        
+
                         return { found: false };
                     });
 
                     if (switchResult.found) {
                         console.log(`   🖱️  Clicked element "${switchResult.text}" (${switchResult.tag})`);
-                        
+
                         // Wait for UI update
                         await new Promise(r => setTimeout(r, 1000));
-                        
+
                         // Take a debug screenshot to see if it switched
                         await page.screenshot({ path: 'debug_tab_switch.png' });
                         console.log('   📸 Saved screenshot to debug_tab_switch.png');
@@ -251,7 +251,7 @@ async function scrapeQyyjt(url, username, password) {
                             console.log('   ✅ Password input appeared!');
                         } else {
                             console.log('   ⚠️ Password input NOT found. Trying fallback click...');
-                            
+
                             // Fallback: Try clicking by coordinates or using a broader selector
                             await page.evaluate(() => {
                                 const el = document.querySelector('.login-tab-item:nth-child(2)'); // Guessing class
@@ -396,7 +396,7 @@ async function scrapeQyyjt(url, username, password) {
 
         // --- PART 2: Switch to "Statistics by Company" (按公司统计) ---
         console.log('\n🔄 Switching to "Statistics by Company" (按公司统计)...');
-        
+
         try {
             const switched = await page.evaluate(() => {
                 const tabs = Array.from(document.querySelectorAll('div, span, li, a'));
@@ -411,19 +411,19 @@ async function scrapeQyyjt(url, username, password) {
             if (switched) {
                 console.log('   ✅ Clicked "Statistics by Company" tab');
                 await new Promise(r => setTimeout(r, 3000)); // Wait for tab switch
-                
+
                 // Select "近1月" (Recent 1 month) filter
                 console.log('   🔽 Selecting "近1月" time filter...');
                 try {
                     const filterSelected = await page.evaluate(() => {
                         // Find the dropdown/select for time filter
                         const dropdowns = Array.from(document.querySelectorAll('input, div, span'));
-                        const timeFilter = dropdowns.find(el => 
-                            el.textContent.includes('近1月') || 
-                            el.textContent.includes('近1月')  ||
+                        const timeFilter = dropdowns.find(el =>
+                            el.textContent.includes('近1月') ||
+                            el.textContent.includes('近1月') ||
                             el.getAttribute('placeholder')?.includes('时间')
                         );
-                        
+
                         if (timeFilter) {
                             timeFilter.click();
                             return { clicked: true, type: '找到下拉框' };
@@ -434,7 +434,7 @@ async function scrapeQyyjt(url, username, password) {
                     if (filterSelected.clicked) {
                         console.log(`   ✅ Clicked time filter dropdown`);
                         await new Promise(r => setTimeout(r, 500));
-                        
+
                         // Click "近1月" option
                         await page.evaluate(() => {
                             const options = Array.from(document.querySelectorAll('li, div, span'));
@@ -451,7 +451,7 @@ async function scrapeQyyjt(url, username, password) {
                 } catch (e) {
                     console.log('   ⚠️ Error selecting time filter:', e.message);
                 }
-                
+
                 // Scroll Company Statistics view
                 console.log('   📜 Scrolling "Statistics by Company" view...');
                 for (let i = 0; i < 5; i++) {
@@ -482,20 +482,20 @@ async function scrapeQyyjt(url, username, password) {
         // Process captured API data
         // We process ALL captured data that looks like it has items
         console.log(`📊 Processing ${capturedData.length} captured API responses...`);
-        
+
         // Save captured data to file for debugging
         fs.writeFileSync('captured_data.json', JSON.stringify(capturedData, null, 2));
         console.log(`   📄 Saved captured API data to captured_data.json`);
-        
+
         const data = []; // Initialize data array
 
         capturedData.forEach(response => {
             let items = [];
-            
+
             // Format 1: data.data.items (Standard API)
             if (response.data && response.data.data && Array.isArray(response.data.data.items)) {
                 items = response.data.data.items;
-            } 
+            }
             // Format 2: data.items (Some APIs)
             else if (response.data && Array.isArray(response.data.items)) {
                 items = response.data.items;
@@ -507,18 +507,33 @@ async function scrapeQyyjt(url, username, password) {
 
             if (items.length > 0) {
                 console.log(`   Found ${items.length} items in ${response.url}`);
-                
+
+                // DEBUG: Print the first item's keys and values to help find the URL
+                if (items.length > 0) {
+                    console.log('\n🔍 DEBUG: First Item Structure:');
+                    const firstItem = items[0];
+                    Object.keys(firstItem).forEach(key => {
+                        const val = firstItem[key];
+                        const valStr = typeof val === 'object' ? JSON.stringify(val).substring(0, 50) + '...' : String(val).substring(0, 100);
+                        console.log(`   - ${key}: ${valStr}`);
+                    });
+                    console.log('-------------------------------------------\n');
+                }
+
                 items.forEach(item => {
                     // Try to extract fields based on common patterns
                     const mainRelated = item.related && item.related.length > 0 ? item.related[0] : {};
-                    
+
                     // Determine fields based on available data
                     const date = item.date || item.publishDate || item.updateTime || '';
                     const title = item.title || item.companyName || ''; // Company stats might use companyName as title
                     const summary = item.summary || mainRelated.shortCompanyName || mainRelated.companyName || '查看';
                     const source = item.originalSource || item.source || '企业预警通';
                     const related = mainRelated.shortCompanyName || mainRelated.companyName || item.companyName || '';
-                    
+
+                    // DEBUG: Check for URL in various fields
+                    const possibleUrl = item.originalUrl || item.url || item.link || item.webUrl || item.sourceUrl || item.contentUrl || '';
+
                     // Only add if we have at least a date and title/related
                     if (date && (title || related)) {
                         data.push({
@@ -528,11 +543,11 @@ async function scrapeQyyjt(url, username, password) {
                             source: source,
                             related_enterprise: related,
                             importance: mainRelated.importanceABS || item.importance || '一般',
-                            sentiment: (mainRelated.negative === '-1' || item.negative === '-1') ? '负面' : 
-                                      ((mainRelated.negative === '1' || item.negative === '1') ? '正面' : '中性'),
+                            sentiment: (mainRelated.negative === '-1' || item.negative === '-1') ? '负面' :
+                                ((mainRelated.negative === '1' || item.negative === '1') ? '正面' : '中性'),
                             level1_category: item.firstLevelName || item.eventType || '',
                             level2_category: mainRelated.lastLevelName || item.subEventType || '',
-                            url: item.originalUrl || ''
+                            url: possibleUrl
                         });
                     }
                 });

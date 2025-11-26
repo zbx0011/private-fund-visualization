@@ -13,6 +13,7 @@ const puppeteer = require('puppeteer');
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const { execSync } = require('child_process');
 
 // Configuration
 const EDGE_PATH = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
@@ -47,6 +48,17 @@ function parseDate(dateStr) {
         return `${year}-${dateStr}`;
     }
     return dateStr;
+}
+
+// Helper to kill Edge processes
+function killEdgeProcesses() {
+    try {
+        console.log('🔪 Killing running Edge processes...');
+        execSync('taskkill /F /IM msedge.exe', { stdio: 'ignore' });
+        console.log('✅ Edge processes killed.');
+    } catch (e) {
+        // Ignore error if no process found
+    }
 }
 
 /**
@@ -118,6 +130,16 @@ async function extractTableData(page, tabName) {
             let sentiment = getText(idxSentiment); // Sentiment usually doesn't have the suffix
             let source = getText(idxSource);
 
+            // DEBUG: Print info for the first few rows to debug URL extraction
+            if (results.length < 3) {
+                console.log(`\n🔍 DEBUG ROW ${results.length + 1}:`);
+                console.log(`   Title: ${title}`);
+                console.log(`   Extracted URL: ${url}`);
+                if (idxTitle !== -1 && cells[idxTitle]) {
+                    console.log(`   Title Cell HTML: ${cells[idxTitle].innerHTML.substring(0, 200)}...`);
+                }
+            }
+
             // Tab-specific fields
             let related_enterprise = '';
             let level1_category = '';
@@ -149,6 +171,12 @@ async function extractTableData(page, tabName) {
 }
 
 async function scrapeData(url) {
+    // Kill Edge first
+    killEdgeProcesses();
+
+    console.log('⏳ Waiting 3 seconds for processes to exit...');
+    await new Promise(r => setTimeout(r, 3000));
+
     console.log(`🚀 Starting Edge scraper for: ${url}`);
     console.log(`👤 Using User Data Dir: ${USER_DATA_DIR}`);
     console.log(`⚠️  IMPORTANT: Please ensure all Edge windows are CLOSED before proceeding.`);
@@ -170,13 +198,61 @@ async function scrapeData(url) {
     const allRecords = [];
     // Store records by date for fuzzy matching: Map<DateString, Set<TitleString>>
     const seenRecords = new Map();
+    // Store captured API items to enrich DOM data
+    let capturedApiItems = [];
 
     try {
         const pages = await browser.pages();
         const page = pages.length > 0 ? pages[0] : await browser.newPage();
 
+        // Forward console logs from browser to terminal
+        page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+
+        // Intercept API responses to get raw data
+        page.on('response', async response => {
+            const request = response.request();
+            if (request.resourceType() === 'xhr' || request.resourceType() === 'fetch') {
+                try {
+                    const url = response.url();
+
+                    // Capture data from getInfoList
+                    if (url.includes('getInfoList')) {
+                        const json = await response.json();
+                        let items = [];
+                        if (json.data && Array.isArray(json.data.list)) items = json.data.list;
+                        else if (json.data && Array.isArray(json.data)) items = json.data;
+                        else if (Array.isArray(json)) items = json;
+
+                        if (items.length > 0) {
+                            console.log(`\n📥 Captured ${items.length} items from API: ${url}`);
+
+                            // Debug: Print first item's keys and URL field
+                            try {
+                                console.log('   First item keys:', Object.keys(items[0]).join(', '));
+                                const urlField = Object.keys(items[0]).find(k => k.toLowerCase().includes('url') || k.toLowerCase().includes('link'));
+                                if (urlField && items[0][urlField]) {
+                                    console.log(`   ✅ Possible URL field found: ${urlField} = ${items[0][urlField].substring(0, 150)}`);
+                                }
+                            } catch (err) {
+                                console.log('   Error inspecting item:', err.message);
+                            }
+
+                            capturedApiItems = capturedApiItems.concat(items);
+                        }
+                    }
+                } catch (e) {
+                    // Ignore
+                }
+            }
+        });
+
         console.log(`📄 Loading page...`);
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        console.log(`✅ Page loaded (DOM Content Loaded)`);
+
+        // Wait a bit more for dynamic content and API responses
+        console.log('⏳ Waiting 5 seconds for data to load...');
+        await new Promise(r => setTimeout(r, 5000));
 
         // Helper to click tab by text
         const clickTab = async (text) => {
@@ -226,7 +302,17 @@ async function scrapeData(url) {
         const foundTab1 = await clickTab('最新动态');
         if (foundTab1) await new Promise(r => setTimeout(r, 2000));
 
-        const records1 = await extractTableData(page, '最新动态');
+        let records1 = await extractTableData(page, '最新动态');
+
+        // Enrich with API data
+        records1 = records1.map(rec => {
+            const match = capturedApiItems.find(item => item.title && (item.title.includes(rec.title) || rec.title.includes(item.title)));
+            if (match && match.originalUrl) {
+                rec.url = match.originalUrl;
+            }
+            return rec;
+        });
+
         addUniqueRecords(records1, 'Latest Updates');
 
         // --- Scrape Tab 2: 按公司统计 ---
@@ -235,7 +321,17 @@ async function scrapeData(url) {
 
         if (foundTab2) {
             await new Promise(r => setTimeout(r, 3000));
-            const records2 = await extractTableData(page, '按公司统计');
+            let records2 = await extractTableData(page, '按公司统计');
+
+            // Enrich with API data
+            records2 = records2.map(rec => {
+                const match = capturedApiItems.find(item => item.title && (item.title.includes(rec.title) || rec.title.includes(item.title)));
+                if (match && match.originalUrl) {
+                    rec.url = match.originalUrl;
+                }
+                return rec;
+            });
+
             addUniqueRecords(records2, 'Company Statistics');
         } else {
             console.log('⚠️  "按公司统计" tab not found.');
@@ -259,6 +355,12 @@ async function scrapeData(url) {
 }
 
 function saveRecords(records) {
+    // Clear old records before inserting new ones
+    console.log('🗑️  Clearing old records...');
+    const deleteStmt = db.prepare('DELETE FROM external_monitor');
+    const deleteResult = deleteStmt.run();
+    console.log(`   Deleted ${deleteResult.changes} old records`);
+
     const stmt = db.prepare(`
         INSERT OR IGNORE INTO external_monitor (
             date, title, summary, source, related_enterprise,

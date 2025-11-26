@@ -1,8 +1,5 @@
-'use client'
-
-import { useState, useEffect, useRef, useMemo } from 'react'
-import { Search, Download, FileText, Bell, Mail, ExternalLink } from 'lucide-react'
-import { cn } from '@/lib/utils'
+﻿import { useState, useEffect, useMemo } from 'react'
+import { ExternalLink } from 'lucide-react'
 
 interface ExternalMonitorData {
     id: number;
@@ -217,23 +214,6 @@ export function ExternalMonitorModule() {
 
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 min-h-[800px]">
-            {/* Header */}
-            <div className="p-4 border-b border-gray-200 bg-blue-50/30 flex justify-between items-center">
-                <h2 className="text-lg font-bold text-gray-900">外部信息监控</h2>
-                <button
-                    onClick={() => {
-                        setLoading(true);
-                        fetchData();
-                        // Simulate a short delay for better UX
-                        setTimeout(() => setLoading(false), 500);
-                    }}
-                    className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
-                >
-                    <span>🔄</span> 刷新数据
-                </button>
-
-            </div>
-
             {/* Tabs */}
             <div className="px-4 pt-4 border-b border-gray-200">
                 <div className="flex space-x-6">
@@ -258,48 +238,8 @@ export function ExternalMonitorModule() {
                 </div>
             </div>
 
-            {/* Filters (Only show for Latest view for now, or keep common) */}
-            {
-                activeTab === 'latest' && (
-                    <div className="p-4 flex flex-wrap items-center justify-between gap-4 border-b border-gray-100">
-                        <div className="flex flex-wrap items-center gap-3">
-                            <select className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2">
-                                <option>近1周</option>
-                                <option>近1月</option>
-                                <option>近3月</option>
-                            </select>
-                            <select className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2">
-                                <option>重要性</option>
-                                <option>高</option>
-                                <option>中</option>
-                                <option>低</option>
-                            </select>
-                            <select className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2">
-                                <option>正负面</option>
-                                <option>正面</option>
-                                <option>负面</option>
-                                <option>中性</option>
-                            </select>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                                    <Search className="w-4 h-4 text-gray-500" />
-                                </div>
-                                <input
-                                    type="text"
-                                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-64 pl-10 p-2"
-                                    placeholder="请输入公司名称"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex items-center text-sm text-gray-500">
-                            共 <span className="font-bold text-gray-900 mx-1">{monitorData.length}</span> 条信息
-                        </div>
-                    </div>
-                )
-            }
-
             {/* Content */}
             {activeTab === 'latest' ? renderLatestView() : renderCompanyView()}
-        </div >
+        </div>
     )
 }
