@@ -427,8 +427,8 @@ export class LarkSyncService {
           const stmt = dbInstance.prepare(`
             INSERT INTO fund_nav_history (
               fund_id, nav_date, unit_nav, cumulative_nav, daily_return,
-              total_assets, status, cost, market_value, position_change
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              total_assets, status, cost, market_value, position_change, daily_pnl
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `)
 
           for (const record of records) {
@@ -445,6 +445,7 @@ export class LarkSyncService {
               const cost = this.parseNumber(fields['投资成本'])
               const marketValue = this.parseNumber(fields['市值'])
               const positionChange = this.parseNumber(fields['持仓变化'])
+              const dailyPnl = this.parseNumber(fields['当日盈亏'])
 
               if (!fundName || !navDate) continue
 
@@ -458,7 +459,8 @@ export class LarkSyncService {
                 status,
                 cost,
                 marketValue,
-                positionChange
+                positionChange,
+                dailyPnl
               ], (err: Error | null) => {
                 if (err) {
                   console.error(`插入历史数据失败 ${fundName}:`, err)

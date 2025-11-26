@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { formatCurrency, formatPercent } from '@/lib/utils'
@@ -16,11 +16,35 @@ type TimeRange = 'daily' | 'weekly' | 'yearly'
 export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChartProps) {
     const [viewType, setViewType] = useState<ViewType>('product')
     const [timeRange, setTimeRange] = useState<TimeRange>('daily')
+    const [selectedDate, setSelectedDate] = useState<string>('')
+    const [dailyData, setDailyData] = useState<any[]>([])
+
+    // Fetch daily PnL data when a specific date is selected
+    useEffect(() => {
+        if (timeRange === 'daily' && selectedDate) {
+            fetch(`/api/funds/daily-pnl?date=${selectedDate}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        setDailyData(data)
+                    }
+                })
+                .catch(err => console.error('Failed to fetch daily PnL:', err))
+        } else {
+            setDailyData([])
+        }
+    }, [selectedDate, timeRange])
 
     const chartData = useMemo(() => {
         if (!funds || funds.length === 0) return []
 
         let data: any[] = []
+
+        // Determine source data based on time range and selection
+        let sourceFunds = funds
+        if (timeRange === 'daily' && selectedDate && dailyData.length > 0) {
+            sourceFunds = dailyData
+        }
 
         // Helper to get value based on time range
         const getValue = (fund: any) => {
@@ -32,24 +56,26 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
         }
 
         if (viewType === 'product') {
-            // Filter out funds with 0 cost if needed, or just show all active
-            data = funds
-                .filter(f => f.status !== '已赎回') // Only show active funds? Or all? Let's show active for now.
+            data = sourceFunds
+                .filter(f => {
+                    if (f.status === '已赎回') return false
+                    return true
+                })
                 .map(f => ({
                     name: f.name,
                     value: getValue(f),
-                    // Extra info for tooltip
                     strategy: f.strategy,
                     manager: f.manager,
                     latest_nav_date: f.latest_nav_date
                 }))
-                .sort((a, b) => a.value - b.value) // Sort by value ascending (Losses Left, Profits Right)
+                .sort((a, b) => a.value - b.value)
         } else {
             // Aggregation for Strategy or Manager
             const map = new Map<string, { totalValue: number, totalCost: number, count: number }>()
 
-            funds.forEach(f => {
-                if (f.status === '已赎回') return // Skip redeemed for aggregation
+            sourceFunds.forEach(f => {
+                if (f.status === '已赎回') return
+                if (timeRange === 'daily' && selectedDate && (f.daily_pnl === undefined || f.daily_pnl === null)) return
 
                 const key = viewType === 'strategy' ? f.strategy : f.manager
                 if (!key) return
@@ -59,12 +85,9 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
                 }
                 const entry = map.get(key)!
 
-                // For Daily PnL, we sum the PnL
-                // For Returns, we calculate weighted average based on Cost
                 if (timeRange === 'daily') {
                     entry.totalValue += (f.daily_pnl || 0)
                 } else {
-                    // Weighted sum for returns: return * cost
                     const cost = f.cost || 0
                     const ret = timeRange === 'weekly' ? (f.weekly_return || 0) : (f.yearly_return || 0)
                     entry.totalValue += ret * cost
@@ -78,7 +101,6 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
                 if (timeRange === 'daily') {
                     value = stats.totalValue
                 } else {
-                    // Weighted Average = (Sum of Return * Cost) / Total Cost
                     value = stats.totalCost > 0 ? stats.totalValue / stats.totalCost : 0
                 }
                 return { name, value }
@@ -86,13 +108,7 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
         }
 
         return data
-    }, [funds, viewType, timeRange])
-
-    const getTitle = () => {
-        const viewMap = { product: '基金产品', strategy: '策略', manager: '投资经理' }
-        const timeMap = { daily: '当日收益', weekly: '七天内收益率', yearly: '本年收益率' }
-        return `${viewMap[viewType]} - ${timeMap[timeRange]}分布`
-    }
+    }, [funds, viewType, timeRange, selectedDate, dailyData])
 
     const formatValue = (val: number) => {
         if (timeRange === 'daily') return formatCurrency(val)
@@ -103,14 +119,11 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
     const CustomTooltip = ({ active, payload }: any) => {
         if (active && payload && payload.length) {
             const data = payload[0].payload
-            // Format date to show only YYYY-MM-DD
             const formatDate = (dateStr: string) => {
                 if (!dateStr) return ''
-                // If it looks like YYYY-MM-DD, return it directly
                 if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr
 
                 const date = new Date(dateStr)
-                // Use local time (Beijing Time)
                 const year = date.getFullYear()
                 const month = String(date.getMonth() + 1).padStart(2, '0')
                 const day = String(date.getDate()).padStart(2, '0')
@@ -130,7 +143,7 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
                     </p>
                     {viewType === 'product' && data.latest_nav_date && (
                         <p style={{ color: '#999', fontSize: '12px', marginTop: '4px' }}>
-                            最新净值日期: {formatDate(data.latest_nav_date)}
+                            {selectedDate ? '日期' : '最新净值日期'}: {formatDate(data.latest_nav_date)}
                         </p>
                     )}
                 </div>
@@ -179,20 +192,34 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
                             ))}
                         </div>
 
-                        {/* Right Controls: Time Range */}
-                        <div className="flex bg-gray-100 p-1 rounded-lg self-start">
-                            {(['daily', 'weekly', 'yearly'] as TimeRange[]).map((range) => (
-                                <button
-                                    key={range}
-                                    onClick={() => setTimeRange(range)}
-                                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${timeRange === range
-                                        ? 'bg-white text-blue-600 shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-900'
-                                        }`}
-                                >
-                                    {range === 'daily' ? '当日' : range === 'weekly' ? '7日' : '本年'}
-                                </button>
-                            ))}
+                        {/* Right Controls: Time Range & Date Picker */}
+                        <div className="flex items-center gap-2">
+                            {timeRange === 'daily' && (
+                                <input
+                                    type="date"
+                                    value={selectedDate}
+                                    onChange={(e) => setSelectedDate(e.target.value)}
+                                    className="px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            )}
+                            <div className="flex bg-gray-100 p-1 rounded-lg self-start">
+                                {(['daily', 'weekly', 'yearly'] as TimeRange[]).map((range) => (
+                                    <button
+                                        key={range}
+                                        onClick={() => {
+                                            setTimeRange(range)
+                                            if (range !== 'daily') setSelectedDate('')
+                                        }}
+                                        className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${(range === 'daily' && timeRange === range && !selectedDate) ||
+                                                (range !== 'daily' && timeRange === range)
+                                                ? 'bg-white text-blue-600 shadow-sm'
+                                                : 'text-gray-500 hover:text-gray-900'
+                                            }`}
+                                    >
+                                        {range === 'daily' ? '最新' : range === 'weekly' ? '7日' : '本年'}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -226,7 +253,7 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
                                 {chartData.map((entry, index) => (
                                     <Cell
                                         key={`cell-${index}`}
-                                        fill={entry.value >= 0 ? '#ef4444' : '#22c55e'} // Red for positive, Green for negative (CN style)
+                                        fill={entry.value >= 0 ? '#ef4444' : '#22c55e'}
                                     />
                                 ))}
                             </Bar>

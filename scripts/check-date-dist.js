@@ -5,11 +5,11 @@ const path = require('path');
 const dbPath = path.join(__dirname, '../data/funds.db');
 const db = new sqlite3.Database(dbPath);
 
-db.all("SELECT status, COUNT(*) as count FROM funds GROUP BY status", (err, rows) => {
+db.all("SELECT nav_date, COUNT(*) as count, COUNT(daily_pnl) as pnl_count FROM fund_nav_history GROUP BY nav_date ORDER BY nav_date DESC LIMIT 20", (err, rows) => {
     if (err) {
         console.error(err);
         return;
     }
-    console.log('Status distribution in funds table:');
+    console.log('Date Distribution in fund_nav_history:');
     console.table(rows);
 });
