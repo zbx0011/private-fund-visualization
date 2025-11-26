@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import Link from 'next/link'
@@ -39,7 +39,7 @@ export function Navigation() {
             <div className="flex items-center">
               <Link href="/" className="flex items-center space-x-2">
                 <TrendingUp className="h-8 w-8 text-blue-600" />
-                <span className="text-xl font-bold text-gray-900">私募数据可视化</span>
+                <span className="text-xl font-bold text-gray-900">私募管理系统</span>
               </Link>
             </div>
             <div className="flex space-x-8">
@@ -72,7 +72,7 @@ export function Navigation() {
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center space-x-2">
               <TrendingUp className="h-6 w-6 text-blue-600" />
-              <span className="text-lg font-bold text-gray-900">私募数据</span>
+              <span className="text-lg font-bold text-gray-900">私募管理</span>
             </Link>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
