@@ -23,88 +23,38 @@ const STRATEGY_TYPES = [
 ]
 
 interface OverviewModuleProps {
-    initialData?: any
+    initialData: any
     initialLoading?: boolean
     initialError?: string | null
+    yieldCurveData?: any
+    monitorData?: any[]
 }
 
-export function OverviewModule({ initialData, initialLoading = false, initialError }: OverviewModuleProps) {
+export function OverviewModule({
+    initialData,
+    initialLoading = false,
+    initialError,
+    yieldCurveData: propYieldCurveData,
+    monitorData: propMonitorData
+}: OverviewModuleProps) {
     const [data, setData] = useState<any>(initialData)
     const [loading, setLoading] = useState(initialLoading)
     const [selectedStrategy, setSelectedStrategy] = useState<string>('all')
-    const [monitorData, setMonitorData] = useState<any[]>([])
 
-    // Fetch full history data when component mounts
+    // Use props directly or default to empty
+    const monitorData = propMonitorData || []
+    const yieldCurveData = propYieldCurveData || null
+
+    // Update local data state when initialData changes (from context refresh)
     useEffect(() => {
-        const loadFullData = async () => {
-            try {
-                setLoading(true)
-
-                // Fetch monitor data
-                const monitorRes = await fetch('/api/monitor?limit=50')
-                const monitorJson = await monitorRes.json()
-                if (monitorJson.success) {
-                    setMonitorData(monitorJson.data)
-                }
-
-                const res = await fetch('/api/funds?type=excluded-fof&includeHistory=true')
-                const json = await res.json()
-                if (json.success) {
-                    const { funds, strategyStats, managerStats } = json.data
-
-                    // Filter funds by status
-                    // 只要不是已赎回状态，都视为正常参与计算
-                    const normalFunds = funds.filter((f: any) => f.status !== '已赎回')
-
-                    // Calculate aggregated metrics
-                    // 1. 总规模: 产品数据的成本列的总和 (仅计算正常状态产品，排除已赎回)
-                    const totalAssets = normalFunds.reduce((sum: number, f: any) => sum + (f.cost || 0), 0)
-
-                    // 2. 总日均资金占用: 飞书多维表格的私募盈亏一览表的日均资金占用列的总和 (包含所有产品)
-                    const totalDailyCapitalUsage = funds.reduce((sum: number, f: any) => sum + (f.daily_capital_usage || 0), 0)
-
-                    // 3. 今日收益: 产品数据的本日收益列的总和 (仅计算正常状态产品)
-                    const todayReturn = normalFunds.reduce((sum: number, f: any) => sum + (f.daily_pnl || 0), 0)
-
-                    // 4. 本周收益率: 飞书多维表格私募盈亏一览表的本周收益列的总和/总规模*100%
-                    // 注意：这里也应该只计算正常产品的本周收益，以与总规模匹配
-                    const totalWeeklyPnl = normalFunds.reduce((sum: number, f: any) => sum + (f.weekly_pnl || 0), 0)
-                    const weeklyReturn = totalAssets ? totalWeeklyPnl / totalAssets : 0
-
-                    // 5. 本年收益率: 飞书多维表格私募盈亏一览表的本年收益列的总和/总日均资金占用*100%
-                    const totalYearlyPnl = funds.reduce((sum: number, f: any) => sum + (f.yearly_pnl || 0), 0)
-                    const annualReturn = totalDailyCapitalUsage ? totalYearlyPnl / totalDailyCapitalUsage : 0
-
-                    // Map strategy stats
-                    const strategyData = strategyStats
-                        .filter((s: any) => !['择时', '宏观'].includes(s.strategy))
-                        .map((s: any) => ({
-                            strategy: s.strategy,
-                            value: s.total_cost || 0,
-                            count: s.fund_count
-                        }))
-
-                    setData({
-                        funds,
-                        strategyStats,
-                        managerStats,
-                        totalAssets,
-                        totalDailyCapitalUsage,
-                        todayReturn,
-                        weeklyReturn,
-                        annualReturn,
-                        strategyData,
-                        lastSyncTime: json.data.lastSyncTime
-                    })
-                }
-            } catch (err) {
-                console.error('Failed to load full history:', err)
-            } finally {
-                setLoading(false)
-            }
+        if (initialData) {
+            setData(initialData)
         }
-        loadFullData()
-    }, [])
+    }, [initialData])
+
+    useEffect(() => {
+        setLoading(initialLoading)
+    }, [initialLoading])
 
     if (loading) {
         return (
@@ -139,152 +89,65 @@ export function OverviewModule({ initialData, initialLoading = false, initialErr
 
     // Process data for the chart
     const getChartData = () => {
-        if (!data.funds) return { chartData: [], series: [] }
-
-        // Filter funds based on selected strategy
-        const filteredFunds = selectedStrategy === 'all'
-            ? data.funds
-            : data.funds.filter((f: any) => f.strategy === selectedStrategy)
+        if (!yieldCurveData || !data?.funds) return { chartData: [], series: [] }
 
         // ---------------------------------------------------------
-        // Scenario 1: "All Strategies" - Aggregate by Strategy
+        // Scenario 1: "All Strategies" - Use Pre-aggregated Data
         // ---------------------------------------------------------
         if (selectedStrategy === 'all') {
-            // We will collect data into a map: Date -> { Strategy -> { sumReturn, sumYearly, count } }
-            const weeklyMap = new Map<string, {
-                date: string,
-                strategies: Map<string, { sumReturn: number, sumYearly: number, count: number }>
-            }>()
-
-            data.funds.forEach((fund: any) => {
-                if (!fund.strategy) return
-                if (['择时', '宏观'].includes(fund.strategy)) return
-                if (!fund.history || fund.history.length === 0) return
-
-                // Filter for 2025 data
-                const history2025 = fund.history
-                    .filter((h: any) => h.date >= '2025-01-01')
-                    .sort((a: any, b: any) => a.date.localeCompare(b.date))
-
-                if (history2025.length === 0) return
-
-                const baseNav = history2025[0].cumulative_nav
-
-                // 1. Identify the value for each week for this fund (take the last available day of the week)
-                const fundWeeklyValues = new Map<string, any>()
-                history2025.forEach((h: any) => {
-                    const dateStr = h.date.split('T')[0]
-                    const weekDate = getWeekEndingDate(dateStr)
-
-                    // Overwrite: later days in the week will replace earlier ones
-                    fundWeeklyValues.set(weekDate, {
-                        cumulative_nav: h.cumulative_nav,
-                        daily_return: h.daily_return || 0
-                    })
-                })
-
-                // 2. Add this fund's weekly values to the global aggregation
-                fundWeeklyValues.forEach((val, weekDate) => {
-                    if (!weeklyMap.has(weekDate)) {
-                        weeklyMap.set(weekDate, { date: weekDate, strategies: new Map() })
-                    }
-                    const weekData = weeklyMap.get(weekDate)!
-
-                    if (!weekData.strategies.has(fund.strategy)) {
-                        weekData.strategies.set(fund.strategy, { sumReturn: 0, sumYearly: 0, count: 0 })
-                    }
-                    const stratStats = weekData.strategies.get(fund.strategy)!
-
-                    const normalizedReturn = baseNav ? (val.cumulative_nav - baseNav) / baseNav : 0
-
-                    stratStats.sumReturn += normalizedReturn
-                    stratStats.sumYearly += normalizedReturn
-                    stratStats.count += 1
-                })
-            })
-
-            // 3. Flatten map to chartData array
-            const chartData = Array.from(weeklyMap.values())
-                .map(item => {
-                    const point: any = { date: item.date }
-                    item.strategies.forEach((stats, strategy) => {
-                        point[strategy] = stats.sumReturn / stats.count
-                        point[`${strategy}_yearly`] = stats.sumYearly / stats.count
-                    })
-                    return point
-                })
-                .sort((a, b) => a.date.localeCompare(b.date))
-
-            // 4. Build Series
-            const strategyColors: Record<string, string> = {
-                '指增': '#3b82f6',
-                '中性': '#10b981',
-                'CTA': '#f59e0b',
-                'T0': '#8b5cf6',
-                '套利': '#ec4899',
-                '量选': '#06b6d4',
-                '混合': '#f97316',
-                '期权': '#6366f1',
-                '择时对冲': '#8b5cf6',
-                '可转债': '#d946ef'
+            return {
+                chartData: yieldCurveData.strategyChartData || [],
+                series: yieldCurveData.strategySeries || []
             }
-
-            const series = Array.from(new Set(data.funds.map((f: any) => f.strategy).filter(Boolean))).map((strategy: any) => ({
-                id: strategy,
-                name: strategy,
-                color: strategyColors[strategy] || `hsl(${Math.random() * 360}, 70%, 50%)`,
-                strokeWidth: 2.5,
-                yearlyKey: `${strategy}_yearly`
-            }))
-
-            return { chartData, series }
         }
 
         // ---------------------------------------------------------
-        // Scenario 2: Specific Strategy - Individual Funds
+        // Scenario 2: Specific Strategy - Use Pre-aggregated Fund Data
         // ---------------------------------------------------------
-        const weeklyMap = new Map<string, any>()
+        const filteredFunds = data.funds.filter((f: any) => f.strategy === selectedStrategy)
+
+        // Collect all dates from the relevant funds
+        const allDates = new Set<string>()
+        const fundSeries: any[] = []
 
         filteredFunds.forEach((fund: any) => {
-            if (!fund.history || fund.history.length === 0) return
+            const fundData = yieldCurveData.fundDataMap?.[fund.record_id]
+            // Fallback to name if record_id not found (handling the linkage issue)
+            const fundDataByName = yieldCurveData.fundDataMap?.[fund.name]
 
-            const history2025 = fund.history
-                .filter((h: any) => h.date >= '2025-01-01')
-                .sort((a: any, b: any) => a.date.localeCompare(b.date))
+            const actualData = fundData || fundDataByName
 
-            if (history2025.length === 0) return
+            if (!actualData) return
 
-            const baseNav = history2025[0].cumulative_nav
-
-            // Group by week
-            history2025.forEach((h: any) => {
-                const dateStr = h.date.split('T')[0]
-                const weekDate = getWeekEndingDate(dateStr)
-
-                if (!weeklyMap.has(weekDate)) {
-                    weeklyMap.set(weekDate, { date: weekDate })
-                }
-                const point = weeklyMap.get(weekDate)
-
-                // Use the latest value for the week (since we iterate sorted by date, this naturally happens)
-                const normalizedReturn = baseNav ? (h.cumulative_nav - baseNav) / baseNav : 0
-
-                point[fund.record_id] = normalizedReturn
-                point[`${fund.record_id}_yearly`] = normalizedReturn
+            fundSeries.push({
+                id: fund.record_id,
+                name: fund.name,
+                color: `hsl(${Math.random() * 360}, 70%, 50%)`,
+                strokeWidth: 2,
+                yearlyKey: `${fund.record_id}_yearly`
             })
+
+            Object.keys(actualData).forEach(date => allDates.add(date))
         })
 
-        const chartData = Array.from(weeklyMap.values()).sort((a, b) => a.date.localeCompare(b.date))
+        const sortedDates = Array.from(allDates).sort()
 
-        const series = filteredFunds.map((fund: any) => ({
-            id: fund.record_id,
-            name: fund.name,
-            color: `hsl(${Math.random() * 360}, 70%, 50%)`,
-            strokeWidth: 2,
-            yearlyKey: `${fund.record_id}_yearly`
-        }))
+        const chartData = sortedDates.map(date => {
+            const point: any = { date }
+            filteredFunds.forEach((fund: any) => {
+                const fundData = yieldCurveData.fundDataMap?.[fund.record_id]
+                const fundDataByName = yieldCurveData.fundDataMap?.[fund.name]
+                const actualData = fundData || fundDataByName
 
-        return { chartData, series }
+                if (actualData && actualData[date] !== undefined) {
+                    point[fund.record_id] = actualData[date]
+                    point[`${fund.record_id}_yearly`] = actualData[date]
+                }
+            })
+            return point
+        })
+
+        return { chartData, series: fundSeries }
     }
 
     const { chartData, series } = getChartData()
@@ -486,6 +349,15 @@ export function OverviewModule({ initialData, initialLoading = false, initialErr
                     )}
                 </CardContent>
             </Card>
+            {/* Debug Info Overlay */}
+            <div className="fixed bottom-4 right-4 bg-black/80 text-white p-4 rounded-lg text-xs font-mono z-50 pointer-events-none opacity-50 hover:opacity-100 transition-opacity">
+                <div className="font-bold mb-2 text-green-400">DEBUG INFO</div>
+                <div>Funds: {data?.funds?.length || 0}</div>
+                <div>Yield Data: {yieldCurveData ? '✅ Loaded' : '❌ Missing'}</div>
+                <div>Monitor Data: {monitorData?.length || 0} items</div>
+                <div>Last Sync: {data?.lastSyncTime || 'N/A'}</div>
+                <div className="mt-2 text-gray-400">Data Source: Global Context</div>
+            </div>
         </div>
     )
 }

@@ -293,6 +293,27 @@ export class Database {
     })
   }
 
+
+  async getYieldCurveData(startDate: string = '2025-01-01'): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT 
+          h.nav_date as date,
+          h.cumulative_nav,
+          h.fund_id,
+          f.strategy,
+          f.name
+        FROM fund_nav_history h
+        JOIN funds f ON (h.fund_id = f.record_id OR h.fund_id = f.name)
+        WHERE h.nav_date >= ? AND f.status != '已赎回'
+        ORDER BY h.nav_date ASC
+      `, [startDate], (err, rows) => {
+        if (err) reject(err)
+        else resolve(rows)
+      })
+    })
+  }
+
   // 关闭数据库连接
   close(): void {
     this.db.close()

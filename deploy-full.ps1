@@ -13,7 +13,7 @@ Write-Host "🚀 Starting FULL VPS deployment..." -ForegroundColor Green
 Write-Host "`n📦 Step 1: Archiving project (excluding node_modules, .git, .next)..." -ForegroundColor Cyan
 # Note: Windows tar might need specific syntax for exclusions
 # We use --exclude before the target to ensure it works on most versions
-tar -czvf $ARCHIVE_NAME --exclude=node_modules --exclude=.git --exclude=.next --exclude=$ARCHIVE_NAME .
+tar -czvf $ARCHIVE_NAME --exclude=node_modules --exclude=.git --exclude=.next --exclude=$ARCHIVE_NAME --exclude=backups --exclude=user_data .
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Failed to create archive"

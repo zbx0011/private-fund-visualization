@@ -17,6 +17,8 @@ export const metadata: Metadata = {
   description: "专业的私募基金数据分析与可视化平台，提供实时业绩监控和策略分析",
 };
 
+import { DashboardProvider } from "@/contexts/DashboardContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,7 +29,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <DashboardProvider>
+          {children}
+        </DashboardProvider>
       </body>
     </html>
   );
