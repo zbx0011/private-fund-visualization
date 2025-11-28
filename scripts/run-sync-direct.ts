@@ -1,35 +1,24 @@
-
 import { LarkSyncService } from '../src/lib/lark-sync';
 import * as dotenv from 'dotenv';
-import * as path from 'path';
+import path from 'path';
 
-// Load environment variables from .env file in root
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.join(process.cwd(), '.env') });
 
-async function runSync() {
-    const appId = process.env.LARK_APP_ID;
-    const appSecret = process.env.LARK_APP_SECRET;
+async function run() {
+    console.log('Starting direct sync...');
     const appToken = process.env.LARK_APP_TOKEN;
-
-    if (!appId || !appSecret || !appToken) {
-        console.error('Missing configuration in .env file');
+    if (!appToken) {
+        console.error('No LARK_APP_TOKEN found');
         process.exit(1);
     }
 
-    console.log('Starting sync with config:', { appId, appToken });
+    const service = new LarkSyncService();
+    const result = await service.syncFromBitable({
+        appToken: appToken,
+        tables: [{ id: 'tblcXqDbfgA0x533', type: 'main' }]
+    });
 
-    const service = new LarkSyncService(appId, appSecret);
-
-    try {
-        const result = await service.syncFromBitable({
-            appToken,
-            autoDetectTable: true
-        });
-
-        console.log('Sync result:', JSON.stringify(result, null, 2));
-    } catch (error) {
-        console.error('Sync failed:', error);
-    }
+    console.log('Sync result:', result);
 }
 
-runSync();
+run().catch(console.error);

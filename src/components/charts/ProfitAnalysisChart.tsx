@@ -123,11 +123,13 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
                 if (!dateStr) return ''
                 if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr
 
-                const date = new Date(dateStr)
-                const year = date.getFullYear()
-                const month = String(date.getMonth() + 1).padStart(2, '0')
-                const day = String(date.getDate()).padStart(2, '0')
-                return `${year}-${month}-${day}`
+                // Use toLocaleDateString to match the Table's formatting and handle timezone consistently
+                // This ensures that if the Table shows 26th, the Chart also shows 26th
+                return new Date(dateStr).toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                }).replace(/\//g, '-')
             }
             return (
                 <div style={{
@@ -211,9 +213,9 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
                                             if (range !== 'daily') setSelectedDate('')
                                         }}
                                         className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${(range === 'daily' && timeRange === range && !selectedDate) ||
-                                                (range !== 'daily' && timeRange === range)
-                                                ? 'bg-white text-blue-600 shadow-sm'
-                                                : 'text-gray-500 hover:text-gray-900'
+                                            (range !== 'daily' && timeRange === range)
+                                            ? 'bg-white text-blue-600 shadow-sm'
+                                            : 'text-gray-500 hover:text-gray-900'
                                             }`}
                                     >
                                         {range === 'daily' ? '最新' : range === 'weekly' ? '7日' : '本年'}

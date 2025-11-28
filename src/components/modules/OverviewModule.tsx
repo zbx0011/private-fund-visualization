@@ -349,15 +349,7 @@ export function OverviewModule({
                     )}
                 </CardContent>
             </Card>
-            {/* Debug Info Overlay */}
-            <div className="fixed bottom-4 right-4 bg-black/80 text-white p-4 rounded-lg text-xs font-mono z-50 pointer-events-none opacity-50 hover:opacity-100 transition-opacity">
-                <div className="font-bold mb-2 text-green-400">DEBUG INFO</div>
-                <div>Funds: {data?.funds?.length || 0}</div>
-                <div>Yield Data: {yieldCurveData ? '✅ Loaded' : '❌ Missing'}</div>
-                <div>Monitor Data: {monitorData?.length || 0} items</div>
-                <div>Last Sync: {data?.lastSyncTime || 'N/A'}</div>
-                <div className="mt-2 text-gray-400">Data Source: Global Context</div>
-            </div>
+
         </div>
     )
 }

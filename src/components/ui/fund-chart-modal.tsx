@@ -72,11 +72,17 @@ export function FundChartModal({ fundName, isOpen, onClose }: FundChartModalProp
         }
     }
 
-    const chartData = historyData.length > 0 ? historyData.map(item => {
-        const virtualNav = parseFloat(item.cumulative_nav || 0)
-        // User requested to subtract 100% (1.0) from the value
-        // Standard yield curve is Cumulative NAV - 1
-        const returnRate = virtualNav > 0 ? virtualNav - 1 : 0
+    // Filter for 2025 data only
+    const currentYearData = historyData
+        .filter(item => item.nav_date >= '2025-01-01')
+        .sort((a, b) => new Date(a.nav_date).getTime() - new Date(b.nav_date).getTime())
+
+    const baseNav = currentYearData.length > 0 ? parseFloat(currentYearData[0].cumulative_nav || 0) : 1
+
+    const chartData = currentYearData.length > 0 ? currentYearData.map(item => {
+        const currentNav = parseFloat(item.cumulative_nav || 0)
+        // Calculate Year-to-Date yield: (Current NAV - Base NAV) / Base NAV
+        const returnRate = baseNav > 0 ? (currentNav - baseNav) / baseNav : 0
 
         return {
             date: item.nav_date,
@@ -86,7 +92,7 @@ export function FundChartModal({ fundName, isOpen, onClose }: FundChartModalProp
 
     const chartSeries = [{
         id: 'returnRate',
-        name: '累计收益率',
+        name: '本年收益率',
         color: '#2563eb'
     }]
 
@@ -94,7 +100,7 @@ export function FundChartModal({ fundName, isOpen, onClose }: FundChartModalProp
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4" onClick={onClose}>
             <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h2 className="text-xl font-semibold" style={{ color: '#000000' }}>{fundName} - 收益率曲线</h2>
+                    <h2 className="text-xl font-semibold" style={{ color: '#000000' }}>{fundName} - 收益率曲线 (2025)</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
                         <X className="h-6 w-6" />
                     </button>
@@ -113,27 +119,27 @@ export function FundChartModal({ fundName, isOpen, onClose }: FundChartModalProp
                         </div>
                     )}
 
-                    {!loading && !error && historyData.length === 0 && (
-                        <div className="text-center py-12 text-gray-500">暂无历史数据</div>
+                    {!loading && !error && currentYearData.length === 0 && (
+                        <div className="text-center py-12 text-gray-500">暂无2025年数据</div>
                     )}
 
-                    {!loading && !error && historyData.length > 0 && (
+                    {!loading && !error && currentYearData.length > 0 && (
                         <div>
                             <div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div className="bg-gray-50 p-4 rounded-lg">
                                     <div className="text-sm text-gray-600 mb-1">数据点数</div>
-                                    <div className="text-lg font-semibold text-gray-900">{historyData.length}</div>
+                                    <div className="text-lg font-semibold text-gray-900">{currentYearData.length}</div>
                                 </div>
                                 <div className="bg-gray-50 p-4 rounded-lg">
                                     <div className="text-sm text-gray-600 mb-1">起始日期</div>
                                     <div className="text-lg font-semibold text-gray-900">
-                                        {formatDateSafe(historyData[0].nav_date)}
+                                        {formatDateSafe(currentYearData[0].nav_date)}
                                     </div>
                                 </div>
                                 <div className="bg-gray-50 p-4 rounded-lg">
                                     <div className="text-sm text-gray-600 mb-1">最新日期</div>
                                     <div className="text-lg font-semibold text-gray-900">
-                                        {formatDateSafe(historyData[historyData.length - 1].nav_date)}
+                                        {formatDateSafe(currentYearData[currentYearData.length - 1].nav_date)}
                                     </div>
                                 </div>
                                 <div className="bg-gray-50 p-4 rounded-lg">

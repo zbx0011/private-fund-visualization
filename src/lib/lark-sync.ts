@@ -197,6 +197,16 @@ export class LarkSyncService {
         // 检查基金是否已存在
         const existingFund = await this.findExistingFund(db, fund.name, fund.manager)
 
+        if (fund.name === '世纪前沿量化优选18号') {
+          console.log('DEBUG: Processing 世纪前沿量化优选18号');
+          console.log('DEBUG: Existing fund:', existingFund);
+          console.log('DEBUG: New data:', {
+            latestNavDate: fund.latestNavDate,
+            dailyPnl: fund.dailyPnl,
+            source_table: (fund as any).source_table
+          });
+        }
+
         if (existingFund) {
           // 更新现有记录
           await this.updateFund(db, fund, existingFund.id)

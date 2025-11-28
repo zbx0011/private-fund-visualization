@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
             const weekDate = getWeekEndingDate(dateStr)
 
             // Normalized return: (Current - Base) / Base
-            const val = baseNav ? (row.cumulative_nav - baseNav) / baseNav : 0
+            // Handle case where baseNav is 0 or invalid to avoid Infinity/NaN
+            const val = (baseNav && baseNav > 0) ? (row.cumulative_nav - baseNav) / baseNav : 0
 
             if (!fundWeeklyReturns.has(fundId)) {
                 fundWeeklyReturns.set(fundId, new Map())
@@ -67,7 +68,10 @@ export async function GET(request: NextRequest) {
         // But rawData is flat history.
         // Let's use funds list for strategy mapping to be safe/clean
         const fundStrategyMap = new Map<string, string>()
-        funds.forEach((f: any) => fundStrategyMap.set(f.record_id, f.strategy))
+        funds.forEach((f: any) => {
+            fundStrategyMap.set(f.record_id, f.strategy)
+            fundStrategyMap.set(f.name, f.strategy) // Also map by name as history uses name
+        })
 
         fundWeeklyReturns.forEach((weeklyMap, fundId) => {
             const strategy = fundStrategyMap.get(fundId)
