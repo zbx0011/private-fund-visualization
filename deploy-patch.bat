@@ -13,6 +13,10 @@ echo 1. Creating remote directory...
 ssh -o StrictHostKeyChecking=no root@172.245.53.67 "mkdir -p /root/private-fund-visualization/src/contexts && mkdir -p /root/private-fund-visualization/src/app/api/yield-curve"
 
 echo.
+echo 1.1 Uploading DashboardContext.tsx...
+scp -o StrictHostKeyChecking=no src/contexts/DashboardContext.tsx root@172.245.53.67:/root/private-fund-visualization/src/contexts/
+
+echo.
 echo 2. Uploading database-server.ts...
 scp -o StrictHostKeyChecking=no src/lib/database-server.ts root@172.245.53.67:/root/private-fund-visualization/src/lib/
 
@@ -30,19 +34,5 @@ scp -o StrictHostKeyChecking=no src/components/modules/OverviewModule.tsx root@1
 
 echo.
 echo 3.1 Uploading FundChartModal.tsx...
-scp -o StrictHostKeyChecking=no src/components/ui/fund-chart-modal.tsx root@172.245.53.67:/root/private-fund-visualization/src/components/ui/
-
-echo.
-echo 3.2 Uploading ProfitAnalysisChart.tsx...
-scp -o StrictHostKeyChecking=no src/components/charts/ProfitAnalysisChart.tsx root@172.245.53.67:/root/private-fund-visualization/src/components/charts/
-echo.
-echo 6. Uploading layout.tsx...
-scp -o StrictHostKeyChecking=no src/app/layout.tsx root@172.245.53.67:/root/private-fund-visualization/src/app/
-
-echo.
-echo 7. Building and Restarting...
-ssh -o StrictHostKeyChecking=no root@172.245.53.67 "cd /root/private-fund-visualization && npm run build && pm2 restart all"
-
-echo.
 echo ✅ Done!
 pause

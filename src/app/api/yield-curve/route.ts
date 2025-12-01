@@ -22,30 +22,65 @@ export async function GET(request: NextRequest) {
 
         // --- Aggregation Logic ---
 
-        // A. Prepare Weekly Data for each Fund
-        // Map: FundID -> Map<WeekDate, NormalizedReturn>
-        const fundWeeklyReturns = new Map<string, Map<string, number>>()
-        const fundBaseNavs = new Map<string, number>()
+        // 1. Group raw data by fund and week (keeping cumulative_nav)
+        const fundWeeklyNavs = new Map<string, Map<string, number>>()
+        const fundLatestDates = new Map<string, string>()
 
         rawData.forEach((row: any) => {
-            const fundId = row.fund_id
-            if (!fundBaseNavs.has(fundId)) {
-                fundBaseNavs.set(fundId, row.cumulative_nav)
-            }
-            const baseNav = fundBaseNavs.get(fundId)!
-
-            const dateStr = row.date.split('T')[0]
+            const dateStr = row.date
             const weekDate = getWeekEndingDate(dateStr)
+            const fundId = row.fund_id
 
-            // Normalized return: (Current - Base) / Base
-            // Handle case where baseNav is 0 or invalid to avoid Infinity/NaN
-            const val = (baseNav && baseNav > 0) ? (row.cumulative_nav - baseNav) / baseNav : 0
-
-            if (!fundWeeklyReturns.has(fundId)) {
-                fundWeeklyReturns.set(fundId, new Map())
+            if (!fundWeeklyNavs.has(fundId)) {
+                fundWeeklyNavs.set(fundId, new Map())
             }
-            // Last day of week overwrites previous (since rows are sorted by date)
-            fundWeeklyReturns.get(fundId)!.set(weekDate, val)
+            // Always overwrite to get the last NAV of the week (since rawData is sorted by date)
+            fundWeeklyNavs.get(fundId)!.set(weekDate, row.cumulative_nav)
+
+            // Track latest date for this fund
+            const currentLatest = fundLatestDates.get(fundId) || ''
+            if (dateStr > currentLatest) {
+                fundLatestDates.set(fundId, dateStr)
+            }
+        })
+
+        // 2. Calculate Yields using Implied Start NAV
+        // Formula: Start_Nav = Latest_Nav / (1 + Yearly_Return)
+        // Yield_t = (Nav_t - Start_Nav) / Start_Nav
+
+        const fundWeeklyReturns = new Map<string, Map<string, number>>()
+
+        fundWeeklyNavs.forEach((weeklyNavs, fundId) => {
+            const fundInfo = funds.find((f: any) => f.record_id === fundId || f.name === fundId)
+
+            if (!fundInfo) return
+
+            const sortedWeeks = Array.from(weeklyNavs.keys()).sort()
+            const latestWeek = sortedWeeks[sortedWeeks.length - 1]
+            const latestNav = weeklyNavs.get(latestWeek)
+
+            if (!latestNav) return
+
+            let startNav = 0
+            const yearlyReturn = fundInfo.yearly_return
+
+            // If we have a valid yearly_return, use it to back-calculate start NAV
+            if (typeof yearlyReturn === 'number' && !isNaN(yearlyReturn)) {
+                startNav = latestNav / (1 + yearlyReturn)
+            } else {
+                // Fallback: Use the first available NAV in the series (Yield starts at 0)
+                const firstWeek = sortedWeeks[0]
+                startNav = weeklyNavs.get(firstWeek) || 1
+            }
+
+            // Calculate yields
+            const yields = new Map<string, number>()
+            weeklyNavs.forEach((nav, date) => {
+                const y = (startNav > 0) ? (nav - startNav) / startNav : 0
+                yields.set(date, y)
+            })
+
+            fundWeeklyReturns.set(fundId, yields)
         })
 
         // B. Aggregate by Strategy
@@ -64,9 +99,6 @@ export async function GET(request: NextRequest) {
         }
 
         // Iterate through funds to build strategy map
-        // We need to know strategy for each fund. rawData has it.
-        // But rawData is flat history.
-        // Let's use funds list for strategy mapping to be safe/clean
         const fundStrategyMap = new Map<string, string>()
         funds.forEach((f: any) => {
             fundStrategyMap.set(f.record_id, f.strategy)

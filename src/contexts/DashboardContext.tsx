@@ -27,9 +27,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
             // Parallel fetch for all required data
             const [fundsRes, yieldRes, monitorRes] = await Promise.all([
-                fetch('/api/funds?type=excluded-fof'),
-                fetch('/api/yield-curve'),
-                fetch('/api/monitor?limit=50')
+                fetch('/api/funds?type=excluded-fof', { cache: 'no-store' }),
+                fetch('/api/yield-curve', { cache: 'no-store' }),
+                fetch('/api/monitor?limit=50', { cache: 'no-store' })
             ])
 
             const fundsJson = await fundsRes.json()
