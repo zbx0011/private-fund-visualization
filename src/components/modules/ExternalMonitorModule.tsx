@@ -216,25 +216,36 @@ export function ExternalMonitorModule() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 min-h-[800px]">
             {/* Tabs */}
             <div className="px-4 pt-4 border-b border-gray-200">
-                <div className="flex space-x-6">
-                    <button
-                        onClick={() => setActiveTab('latest')}
-                        className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'latest'
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                            }`}
-                    >
-                        最新动态
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('company')}
-                        className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'company'
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                            }`}
-                    >
-                        按公司统计
-                    </button>
+                <div className="flex items-center justify-between">
+                    <div className="flex space-x-6">
+                        <button
+                            onClick={() => setActiveTab('latest')}
+                            className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'latest'
+                                ? 'border-blue-600 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                        >
+                            最新动态
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('company')}
+                            className={`pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'company'
+                                ? 'border-blue-600 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                        >
+                            按公司统计
+                        </button>
+                    </div>
+                    <div className="text-sm text-gray-500 pb-2">
+                        {monitorData.length > 0 && (
+                            <>
+                                (数据更新于: {
+                                    [...monitorData].sort((a, b) => b.date.localeCompare(a.date))[0]?.date || '-'
+                                })
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 

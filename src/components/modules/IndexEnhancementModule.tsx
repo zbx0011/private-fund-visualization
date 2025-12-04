@@ -15,6 +15,7 @@ import {
 } from 'recharts'
 import { DataTable, TableColumn } from '@/components/ui/table'
 import { formatPercent, formatNumber } from '@/lib/utils'
+import { X } from 'lucide-react'
 
 // Helper function to shorten fund names by removing common suffixes
 const shortenFundName = (name: string): string => {
@@ -46,6 +47,10 @@ export function IndexEnhancementModule() {
   const [indices, setIndices] = useState<IndexData[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Modal state for individual fund chart
+  const [selectedFund, setSelectedFund] = useState<any | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+
   useEffect(() => {
     async function fetchData() {
       try {
@@ -73,15 +78,25 @@ export function IndexEnhancementModule() {
     if (loading) return { chartData: [], tableData: [] }
 
     // 1. Align Dates
-    // Combine dates from both indices and funds to show complete history
-    // Each fund/index will only show data on dates where it has values
+    // When a specific strategy is selected, only use dates where those funds have data
+    // This ensures the X-axis starts from the earliest date of the selected strategy's products
     const dateSet = new Set<string>()
 
-    // Add all index dates
-    indices.forEach(i => dateSet.add(i.date))
+    // For chart display: use filtered funds' dates as the primary range
+    // Add all filtered fund dates first
+    filteredFunds.forEach(f => f.history.forEach(h => dateSet.add(h.date)))
 
-    // Add all fund dates
-    funds.forEach(f => f.history.forEach(h => dateSet.add(h.date)))
+    // Also add index dates that fall within the fund date range
+    if (dateSet.size > 0) {
+      const fundDates = Array.from(dateSet).sort()
+      const minFundDate = fundDates[0]
+      const maxFundDate = fundDates[fundDates.length - 1]
+      indices.forEach(i => {
+        if (i.date >= minFundDate && i.date <= maxFundDate) {
+          dateSet.add(i.date)
+        }
+      })
+    }
 
     let dates = Array.from(dateSet).sort()
 
@@ -366,15 +381,16 @@ export function IndexEnhancementModule() {
     <div className="space-y-6">
       {/* Controls */}
       <Card>
-        <CardContent className="py-4 flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <span className="text-base font-semibold text-gray-700">策略筛选:</span>
-            <div className="flex space-x-2">
+        <CardContent className="py-4 flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+          {/* Strategy Filter */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full lg:w-auto">
+            <span className="text-sm sm:text-base font-semibold text-gray-700 whitespace-nowrap">策略筛选:</span>
+            <div className="flex flex-wrap gap-1 sm:gap-2">
               {strategies.map(s => (
                 <button
                   key={s}
                   onClick={() => setSelectedStrategy(s)}
-                  className={`px-4 py-1.5 text-base font-medium rounded-full transition-colors ${selectedStrategy === s
+                  className={`px-2 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-base font-medium rounded-full transition-colors ${selectedStrategy === s
                     ? 'bg-blue-600 text-white shadow-md'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
@@ -385,12 +401,13 @@ export function IndexEnhancementModule() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-6">
+          {/* Time Range & View Mode */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-6">
             {/* Time Range Selector */}
-            <div className="flex items-center space-x-1 bg-blue-50 p-2 rounded-xl border border-blue-200">
+            <div className="flex items-center space-x-1 bg-blue-50 p-1.5 sm:p-2 rounded-xl border border-blue-200">
               <button
                 onClick={() => setTimeRange('2025')}
-                className={`px-5 py-2 text-base font-bold rounded-lg transition-all ${timeRange === '2025'
+                className={`px-3 sm:px-5 py-1.5 sm:py-2 text-sm sm:text-base font-bold rounded-lg transition-all ${timeRange === '2025'
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'text-blue-600 hover:bg-blue-100'
                   }`}
@@ -399,7 +416,7 @@ export function IndexEnhancementModule() {
               </button>
               <button
                 onClick={() => setTimeRange('all')}
-                className={`px-5 py-2 text-base font-bold rounded-lg transition-all ${timeRange === 'all'
+                className={`px-3 sm:px-5 py-1.5 sm:py-2 text-sm sm:text-base font-bold rounded-lg transition-all ${timeRange === 'all'
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'text-blue-600 hover:bg-blue-100'
                   }`}
@@ -408,10 +425,10 @@ export function IndexEnhancementModule() {
               </button>
             </div>
 
-            <div className="flex items-center space-x-1 bg-green-50 p-2 rounded-xl border border-green-200">
+            <div className="flex items-center space-x-1 bg-green-50 p-1.5 sm:p-2 rounded-xl border border-green-200">
               <button
                 onClick={() => setViewMode('nav')}
-                className={`px-5 py-2 text-base font-bold rounded-lg transition-all ${viewMode === 'nav'
+                className={`px-3 sm:px-5 py-1.5 sm:py-2 text-sm sm:text-base font-bold rounded-lg transition-all ${viewMode === 'nav'
                   ? 'bg-green-600 text-white shadow-md'
                   : 'text-green-600 hover:bg-green-100'
                   }`}
@@ -420,7 +437,7 @@ export function IndexEnhancementModule() {
               </button>
               <button
                 onClick={() => setViewMode('excess')}
-                className={`px-5 py-2 text-base font-bold rounded-lg transition-all ${viewMode === 'excess'
+                className={`px-3 sm:px-5 py-1.5 sm:py-2 text-sm sm:text-base font-bold rounded-lg transition-all ${viewMode === 'excess'
                   ? 'bg-green-600 text-white shadow-md'
                   : 'text-green-600 hover:bg-green-100'
                   }`}
@@ -434,21 +451,21 @@ export function IndexEnhancementModule() {
 
       {/* Chart */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <CardTitle className="text-lg sm:text-xl">
             {viewMode === 'nav' ? '累计收益走势对比' : '超额收益走势对比'}
           </CardTitle>
           {viewMode === 'nav' && selectedStrategy !== 'all' && (
-            <span className="text-base font-medium text-gray-600 flex items-center gap-2">
-              <span className="inline-block w-10 border-t-2 border-dashed border-gray-500"></span>
+            <span className="text-sm sm:text-base font-medium text-gray-600 flex items-center gap-2">
+              <span className="inline-block w-8 sm:w-10 border-t-2 border-dashed border-gray-500"></span>
               虚线代表指数走势
             </span>
           )}
         </CardHeader>
         <CardContent>
-          <div className="h-[400px] w-full">
+          <div className="h-[280px] sm:h-[350px] lg:h-[400px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={processedData.chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <LineChart data={processedData.chartData} margin={{ top: 5, right: 15, left: 5, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                 <XAxis
                   dataKey="date"
@@ -531,8 +548,21 @@ export function IndexEnhancementModule() {
 
       {/* Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>产品业绩详情</CardTitle>
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <CardTitle className="text-lg sm:text-xl">产品业绩详情</CardTitle>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-base">
+            <span className="text-gray-500 font-medium">
+              (数据更新于: {
+                funds.length > 0
+                  ? (() => {
+                    const allDates = funds.flatMap(f => f.history?.map(h => h.date) || [])
+                    return allDates.sort((a, b) => b.localeCompare(a))[0] || '-'
+                  })()
+                  : '-'
+              })
+            </span>
+            <span className="text-blue-500 font-medium">(点击产品名称可查看收益率曲线图)</span>
+          </div>
         </CardHeader>
         <CardContent>
           <DataTable
@@ -540,9 +570,222 @@ export function IndexEnhancementModule() {
             columns={columns}
             searchable={true}
             pagination={false}
+            onRowClick={(row) => {
+              setSelectedFund(row)
+              setModalOpen(true)
+            }}
           />
         </CardContent>
       </Card>
+
+      {/* Individual Fund Chart Modal */}
+      {modalOpen && selectedFund && (
+        <FundChartModalInline
+          fund={selectedFund}
+          funds={funds}
+          indices={indices}
+          onClose={() => {
+            setModalOpen(false)
+            setSelectedFund(null)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// Inline Modal Component for Individual Fund Chart with Index
+function FundChartModalInline({
+  fund,
+  funds,
+  indices,
+  onClose
+}: {
+  fund: any
+  funds: FundData[]
+  indices: IndexData[]
+  onClose: () => void
+}) {
+  // Find original fund data with complete history
+  const originalFund = funds.find(f => f.id === fund.id) || fund
+
+  // Determine benchmark index based on strategy
+  const getBenchmarkCode = (strategy: string) => {
+    if (strategy?.includes('300')) return '000300.SH'
+    if (strategy?.includes('500') || strategy?.includes('A500')) return '000905.SH'
+    if (strategy?.includes('1000')) return '000852.SH'
+    if (strategy?.includes('2000')) return '932000.CSI'
+    if (strategy?.includes('量化选股') || strategy?.includes('全市场')) return '000906.SH'
+    return '000905.SH' // Default to CSI 500
+  }
+
+  const getBenchmarkName = (code: string) => {
+    switch (code) {
+      case '000300.SH': return '沪深300'
+      case '000905.SH': return '中证500'
+      case '000852.SH': return '中证1000'
+      case '932000.CSI': return '中证2000'
+      case '000906.SH': return '中证800'
+      default: return '指数'
+    }
+  }
+
+  const benchmarkCode = getBenchmarkCode(fund.strategy)
+  const benchmarkName = getBenchmarkName(benchmarkCode)
+
+  // Get fund history from the original fund object with complete history
+  const fundHistory = originalFund.history || []
+  const sortedHistory = [...fundHistory].sort((a: any, b: any) => a.date.localeCompare(b.date))
+
+  // Get index data
+  const indexData = indices
+    .filter(i => i.code === benchmarkCode)
+    .sort((a, b) => a.date.localeCompare(b.date))
+
+  // Find common date range
+  const fundDates = new Set(sortedHistory.map((h: any) => h.date))
+  const minFundDate = sortedHistory.length > 0 ? sortedHistory[0].date : ''
+  const maxFundDate = sortedHistory.length > 0 ? sortedHistory[sortedHistory.length - 1].date : ''
+
+  // Filter index to match fund date range
+  const filteredIndex = indexData.filter(i => i.date >= minFundDate && i.date <= maxFundDate)
+
+  // Calculate normalized returns for fund
+  const fundStartNav = sortedHistory.length > 0
+    ? (sortedHistory[0].cumulative_nav || sortedHistory[0].unit_nav || 1)
+    : 1
+
+  const fundChartData = sortedHistory.map((h: any) => ({
+    date: h.date,
+    fundReturn: ((h.cumulative_nav || h.unit_nav || 1) / fundStartNav - 1)
+  }))
+
+  // Calculate normalized returns for index
+  const indexStartClose = filteredIndex.length > 0 ? filteredIndex[0].close : 1
+  const indexMap = new Map(filteredIndex.map(i => [i.date, (i.close / indexStartClose - 1)]))
+
+  // Merge data
+  const allDates = new Set([...fundChartData.map(d => d.date), ...filteredIndex.map(d => d.date)])
+  const chartData = Array.from(allDates).sort().map(date => {
+    const fundPoint = fundChartData.find(d => d.date === date)
+    return {
+      date,
+      fund: fundPoint?.fundReturn,
+      index: indexMap.get(date)
+    }
+  })
+
+  const formatDateSafe = (dateStr: string) => {
+    if (!dateStr) return '无日期'
+    try {
+      const date = new Date(dateStr + 'T00:00:00')
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString('zh-CN')
+      }
+      return dateStr
+    } catch (e) {
+      return dateStr
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+          <h2 className="text-base sm:text-xl font-semibold text-gray-900 truncate pr-2">{shortenFundName(fund.name)} - 收益率曲线</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+            <X className="h-5 w-5 sm:h-6 sm:w-6" />
+          </button>
+        </div>
+
+        <div className="p-4 sm:p-6 overflow-y-auto" style={{ maxHeight: 'calc(95vh - 100px)' }}>
+          {/* Stats */}
+          <div className="mb-4 grid grid-cols-3 gap-2 sm:gap-4">
+            <div className="bg-gray-50 p-2 sm:p-4 rounded-lg">
+              <div className="text-xs sm:text-sm text-gray-600 mb-1">数据点数</div>
+              <div className="text-sm sm:text-lg font-semibold text-gray-900">{sortedHistory.length}</div>
+            </div>
+            <div className="bg-gray-50 p-2 sm:p-4 rounded-lg">
+              <div className="text-xs sm:text-sm text-gray-600 mb-1">起始日期</div>
+              <div className="text-sm sm:text-lg font-semibold text-gray-900">
+                {formatDateSafe(minFundDate)}
+              </div>
+            </div>
+            <div className="bg-gray-50 p-2 sm:p-4 rounded-lg">
+              <div className="text-xs sm:text-sm text-gray-600 mb-1">最新日期</div>
+              <div className="text-sm sm:text-lg font-semibold text-gray-900">
+                {formatDateSafe(maxFundDate)}
+              </div>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="mb-4 flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm">
+            <span className="flex items-center gap-2">
+              <span className="inline-block w-6 sm:w-8 h-0.5 bg-blue-500"></span>
+              <span className="truncate max-w-[120px] sm:max-w-none">{shortenFundName(fund.name)}</span>
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="inline-block w-6 sm:w-8 border-t-2 border-dashed border-gray-500"></span>
+              {benchmarkName}
+            </span>
+          </div>
+
+          {/* Chart */}
+          <div className="bg-white border border-gray-200 rounded-lg p-2 sm:p-4">
+            <div className="h-[250px] sm:h-[350px] lg:h-[400px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(val) => {
+                      const d = new Date(val)
+                      return `${d.getMonth() + 1}月`
+                    }}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis
+                    tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Tooltip
+                    formatter={(value: number, name: string) => [
+                      `${(value * 100).toFixed(2)}%`,
+                      name === 'fund' ? shortenFundName(fund.name) : benchmarkName
+                    ]}
+                    labelFormatter={(label) => `日期: ${label}`}
+                  />
+                  <ReferenceLine y={0} stroke="#9ca3af" strokeDasharray="3 3" />
+
+                  {/* Fund Line - Solid */}
+                  <Line
+                    type="monotone"
+                    dataKey="fund"
+                    name="fund"
+                    stroke="#2563eb"
+                    strokeWidth={2}
+                    dot={false}
+                    connectNulls
+                  />
+
+                  {/* Index Line - Dashed */}
+                  <Line
+                    type="monotone"
+                    dataKey="index"
+                    name="index"
+                    stroke="#9ca3af"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    dot={false}
+                    connectNulls
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
