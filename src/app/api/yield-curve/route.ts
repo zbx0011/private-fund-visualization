@@ -22,8 +22,9 @@ export async function GET(request: NextRequest) {
 
         // --- Aggregation Logic ---
 
-        // 1. Group raw data by fund and week (keeping cumulative_nav)
+        // 1. Group raw data by fund and week (keeping both cumulative_nav and daily_return)
         const fundWeeklyNavs = new Map<string, Map<string, number>>()
+        const fundWeeklyReturns = new Map<string, Map<string, number>>()
         const fundLatestDates = new Map<string, string>()
 
         rawData.forEach((row: any) => {
@@ -33,9 +34,12 @@ export async function GET(request: NextRequest) {
 
             if (!fundWeeklyNavs.has(fundId)) {
                 fundWeeklyNavs.set(fundId, new Map())
+                fundWeeklyReturns.set(fundId, new Map())
             }
-            // Always overwrite to get the last NAV of the week (since rawData is sorted by date)
+            // Always overwrite to get the last NAV and return of the week (since rawData is sorted by date)
             fundWeeklyNavs.get(fundId)!.set(weekDate, row.cumulative_nav)
+            // Use daily_return which actually contains yearly return from "本年收益率"
+            fundWeeklyReturns.get(fundId)!.set(weekDate, row.daily_return || 0)
 
             // Track latest date for this fund
             const currentLatest = fundLatestDates.get(fundId) || ''
@@ -44,47 +48,11 @@ export async function GET(request: NextRequest) {
             }
         })
 
-        // 2. Calculate Yields using Implied Start NAV
-        // Formula: Start_Nav = Latest_Nav / (1 + Yearly_Return)
-        // Yield_t = (Nav_t - Start_Nav) / Start_Nav
-
-        const fundWeeklyReturns = new Map<string, Map<string, number>>()
-
-        fundWeeklyNavs.forEach((weeklyNavs, fundId) => {
-            const fundInfo = funds.find((f: any) => f.record_id === fundId || f.name === fundId)
-
-            if (!fundInfo) return
-
-            const sortedWeeks = Array.from(weeklyNavs.keys()).sort()
-            const latestWeek = sortedWeeks[sortedWeeks.length - 1]
-            const latestNav = weeklyNavs.get(latestWeek)
-
-            if (!latestNav) return
-
-            let startNav = 0
-            const yearlyReturn = fundInfo.yearly_return
-
-            // If we have a valid yearly_return, use it to back-calculate start NAV
-            if (typeof yearlyReturn === 'number' && !isNaN(yearlyReturn)) {
-                startNav = latestNav / (1 + yearlyReturn)
-            } else {
-                // Fallback: Use the first available NAV in the series (Yield starts at 0)
-                const firstWeek = sortedWeeks[0]
-                startNav = weeklyNavs.get(firstWeek) || 1
-            }
-
-            // Calculate yields
-            const yields = new Map<string, number>()
-            weeklyNavs.forEach((nav, date) => {
-                const y = (startNav > 0) ? (nav - startNav) / startNav : 0
-                yields.set(date, y)
-            })
-
-            fundWeeklyReturns.set(fundId, yields)
-        })
+        // Note: fundWeeklyReturns now contains the actual yearly returns from the database
+        // No need to calculate from NAV anymore
 
         // B. Aggregate by Strategy
-        const strategyWeeklyMap = new Map<string, Map<string, { sum: number, count: number }>>()
+        const strategyWeeklyMap = new Map<string, Map<string, { sum: number, count: number, weightedSum: number, totalCapital: number }>>()
         const strategyColors: Record<string, string> = {
             '指增': '#3b82f6',
             '中性': '#10b981',
@@ -98,16 +66,32 @@ export async function GET(request: NextRequest) {
             '可转债': '#d946ef'
         }
 
-        // Iterate through funds to build strategy map
+        // Iterate through funds to build strategy map and capital map
         const fundStrategyMap = new Map<string, string>()
+        const fundCapitalMap = new Map<string, number>()
+        const strategyTotalCapitalMap = new Map<string, number>()
+
         funds.forEach((f: any) => {
             fundStrategyMap.set(f.record_id, f.strategy)
             fundStrategyMap.set(f.name, f.strategy) // Also map by name as history uses name
+
+            // Use 'cost' which corresponds to "日均资金占用" from the Private Fund Profit/Loss Table
+            const capital = typeof f.cost === 'number' ? f.cost : 0
+            fundCapitalMap.set(f.record_id, capital)
+            fundCapitalMap.set(f.name, capital)
+
+            // Accumulate total capital per strategy (Static Denominator)
+            if (f.strategy && !['择时', '宏观'].includes(f.strategy)) {
+                const currentTotal = strategyTotalCapitalMap.get(f.strategy) || 0
+                strategyTotalCapitalMap.set(f.strategy, currentTotal + capital)
+            }
         })
 
         fundWeeklyReturns.forEach((weeklyMap, fundId) => {
             const strategy = fundStrategyMap.get(fundId)
             if (!strategy || ['择时', '宏观'].includes(strategy)) return
+
+            const capital = fundCapitalMap.get(fundId) || 0
 
             weeklyMap.forEach((val, weekDate) => {
                 if (!strategyWeeklyMap.has(weekDate)) {
@@ -116,11 +100,21 @@ export async function GET(request: NextRequest) {
                 const weekData = strategyWeeklyMap.get(weekDate)!
 
                 if (!weekData.has(strategy)) {
-                    weekData.set(strategy, { sum: 0, count: 0 })
+                    // Initialize with static total capital for the strategy
+                    const staticTotalCapital = strategyTotalCapitalMap.get(strategy) || 0
+                    weekData.set(strategy, { sum: 0, count: 0, weightedSum: 0, totalCapital: staticTotalCapital })
                 }
                 const stats = weekData.get(strategy)!
+
+                // Simple sum for fallback
                 stats.sum += val
                 stats.count += 1
+
+                // Weighted sum numerator: accumulate (return * capital) for active funds
+                if (capital > 0) {
+                    stats.weightedSum += val * capital
+                    // Note: stats.totalCapital is already set to the static total and shouldn't be incremented here
+                }
             })
         })
 
@@ -129,8 +123,18 @@ export async function GET(request: NextRequest) {
             .map(([date, strategies]) => {
                 const point: any = { date }
                 strategies.forEach((stats, strategy) => {
-                    point[strategy] = stats.sum / stats.count
-                    point[`${strategy}_yearly`] = stats.sum / stats.count
+                    let yieldValue = 0
+
+                    // Use weighted average with static total capital
+                    if (stats.totalCapital > 0) {
+                        yieldValue = stats.weightedSum / stats.totalCapital
+                    } else if (stats.count > 0) {
+                        // Fallback to simple average only if total capital is 0 (unlikely if cost data exists)
+                        yieldValue = stats.sum / stats.count
+                    }
+
+                    point[strategy] = yieldValue
+                    point[`${strategy}_yearly`] = yieldValue
                 })
                 return point
             })
@@ -169,7 +173,7 @@ export async function GET(request: NextRequest) {
     } catch (error) {
         console.error('Failed to generate yield curve data:', error)
         return NextResponse.json(
-            { success: false, error: 'Failed to generate data' },
+            { success: false, error: 'Failed to generate data', details: error instanceof Error ? error.message : String(error) },
             { status: 500 }
         )
     }
