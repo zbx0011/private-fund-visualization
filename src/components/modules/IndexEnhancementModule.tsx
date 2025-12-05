@@ -46,6 +46,8 @@ export function IndexEnhancementModule() {
   const [funds, setFunds] = useState<FundData[]>([])
   const [indices, setIndices] = useState<IndexData[]>([])
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
 
   // Modal state for individual fund chart
   const [selectedFund, setSelectedFund] = useState<any | null>(null)
@@ -203,7 +205,7 @@ export function IndexEnhancementModule() {
         if (viewMode === 'nav') {
           if (item) point[f.id] = item.value
         } else {
-          // Excess Return
+          // Excess Return - align index baseline to fund's first data point
           let benchmarkCode = ''
           const strategy = f.strategy || ''
           if (strategy.includes('300')) benchmarkCode = '000300.SH'
@@ -212,11 +214,23 @@ export function IndexEnhancementModule() {
           else if (strategy.includes('2000')) benchmarkCode = '932000.CSI'
           else benchmarkCode = '000905.SH'
 
+          // Get fund's first data point date
+          const fundFirstDate = s?.[0]?.date
+          if (!fundFirstDate) return
+
+          // Only show data from fund's first date onwards
+          if (date < fundFirstDate) return
+
           const indexSeries = series[`index_${benchmarkCode}`]
+
+          // Find index value at fund's first date to use as baseline
+          const indexAtFundStart = indexSeries?.find(d => d.date >= fundFirstDate)
           const indexItem = indexSeries?.find(d => d.date === date)
 
-          if (item && indexItem) {
-            point[f.id] = item.value - indexItem.value
+          if (item && indexItem && indexAtFundStart) {
+            // Calculate index return from fund's start date, not from year start
+            const indexReturnFromFundStart = indexItem.value - indexAtFundStart.value
+            point[f.id] = item.value - indexReturnFromFundStart
           }
         }
       })
@@ -251,10 +265,26 @@ export function IndexEnhancementModule() {
       else benchmarkCode = '000905.SH'
 
       const indexSeries = allTimeSeries[`index_${benchmarkCode}`]
-      const finalIndexValue = indexSeries && indexSeries.length > 0 ? indexSeries[indexSeries.length - 1].value : 0
 
-      const cumulativeExcess = indexSeries ? finalValue - finalIndexValue : 0
-      const annualizedExcess = years > 0 && indexSeries ? Math.pow(1 + cumulativeExcess, 1 / years) - 1 : cumulativeExcess
+      // *** FIX: Align index baseline to fund's first data point ***
+      const fundFirstDate = fundSeries[0].date
+      const fundLastDate = fundSeries[fundSeries.length - 1].date
+
+      // Find index values at fund's start and end dates
+      const indexAtFundStart = indexSeries?.find(d => d.date >= fundFirstDate)
+      const indexAtFundEnd = indexSeries?.find(d => d.date >= fundLastDate) || indexSeries?.[indexSeries.length - 1]
+
+      // Calculate index return from fund's start date (not from year start)
+      let indexReturnFromFundStart = 0
+      if (indexAtFundStart && indexAtFundEnd) {
+        // Index return = (endValue - startValue) / (1 + startValue)
+        // But since our series values are already normalized returns, we calculate:
+        // indexReturnFromFundStart = indexAtFundEnd.value - indexAtFundStart.value
+        indexReturnFromFundStart = indexAtFundEnd.value - indexAtFundStart.value
+      }
+
+      const cumulativeExcess = finalValue - indexReturnFromFundStart
+      const annualizedExcess = years > 0 ? Math.pow(1 + cumulativeExcess, 1 / years) - 1 : cumulativeExcess
 
       // Volatility & Sharpe
       // Need daily returns
@@ -445,6 +475,60 @@ export function IndexEnhancementModule() {
                 超额收益
               </button>
             </div>
+
+            {/* Sync Button */}
+            <button
+              onClick={async () => {
+                setSyncing(true)
+                setSyncMessage(null)
+                try {
+                  const res = await fetch('/api/sync-basic-pool')
+                  const data = await res.json()
+                  if (data.success) {
+                    setSyncMessage(`同步成功: 新增${data.inserted}条, 去重${data.duplicatesRemoved}条`)
+                    // Refresh data
+                    const refreshRes = await fetch('/api/index-enhancement')
+                    const refreshData = await refreshRes.json()
+                    if (refreshData.funds) setFunds(refreshData.funds)
+                    if (refreshData.indices) setIndices(refreshData.indices)
+                  } else {
+                    setSyncMessage(`同步失败: ${data.error}`)
+                  }
+                } catch (error) {
+                  setSyncMessage('同步失败: 网络错误')
+                } finally {
+                  setSyncing(false)
+                  setTimeout(() => setSyncMessage(null), 5000)
+                }
+              }}
+              disabled={syncing}
+              className={`px-4 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${syncing
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-purple-600 text-white hover:bg-purple-700 shadow-md'
+                }`}
+            >
+              {syncing ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  同步中...
+                </>
+              ) : (
+                <>
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  一键同步
+                </>
+              )}
+            </button>
+            {syncMessage && (
+              <span className={`text-sm ${syncMessage.includes('失败') ? 'text-red-600' : 'text-green-600'}`}>
+                {syncMessage}
+              </span>
+            )}
           </div>
         </CardContent>
       </Card>
