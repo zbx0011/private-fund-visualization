@@ -77,12 +77,10 @@ export function FundChartModal({ fundName, isOpen, onClose }: FundChartModalProp
         .filter(item => item.nav_date >= '2025-01-01')
         .sort((a, b) => new Date(a.nav_date).getTime() - new Date(b.nav_date).getTime())
 
-    const baseNav = currentYearData.length > 0 ? parseFloat(currentYearData[0].cumulative_nav || 0) : 1
-
+    // Use yearly_return field directly from Feishu data (stored as daily_return in history)
     const chartData = currentYearData.length > 0 ? currentYearData.map(item => {
-        const currentNav = parseFloat(item.cumulative_nav || 0)
-        // Calculate Year-to-Date yield: (Current NAV - Base NAV) / Base NAV
-        const returnRate = baseNav > 0 ? (currentNav - baseNav) / baseNav : 0
+        // daily_return in fund_nav_history is actually the "本年收益率" from Feishu
+        const returnRate = parseFloat(item.daily_return || 0)
 
         return {
             date: item.nav_date,

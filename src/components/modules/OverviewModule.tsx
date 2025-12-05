@@ -110,6 +110,9 @@ export function OverviewModule({
         const allDates = new Set<string>()
         const fundSeries: any[] = []
 
+        // Store baseline (first value) for each fund to normalize to 0%
+        const fundBaselines = new Map<string, number>()
+
         filteredFunds.forEach((fund: any) => {
             const fundData = yieldCurveData.fundDataMap?.[fund.record_id]
             // Fallback to name if record_id not found (handling the linkage issue)
@@ -118,6 +121,13 @@ export function OverviewModule({
             const actualData = fundData || fundDataByName
 
             if (!actualData) return
+
+            // Find the first (earliest) date and its value as baseline
+            const dates = Object.keys(actualData).sort()
+            if (dates.length > 0) {
+                const firstValue = actualData[dates[0]]
+                fundBaselines.set(fund.record_id, firstValue)
+            }
 
             fundSeries.push({
                 id: fund.record_id,
@@ -140,8 +150,11 @@ export function OverviewModule({
                 const actualData = fundData || fundDataByName
 
                 if (actualData && actualData[date] !== undefined) {
-                    point[fund.record_id] = actualData[date]
-                    point[`${fund.record_id}_yearly`] = actualData[date]
+                    // Normalize: subtract baseline so first point is 0%
+                    const baseline = fundBaselines.get(fund.record_id) || 0
+                    const normalizedValue = actualData[date] - baseline
+                    point[fund.record_id] = normalizedValue
+                    point[`${fund.record_id}_yearly`] = normalizedValue
                 }
             })
             return point
@@ -170,18 +183,21 @@ export function OverviewModule({
                 />
                 <MetricCard
                     title="今日收益"
+                    subtitle="累计收益差（费前）*份额"
                     value={data.todayReturn}
                     format="currency"
                     className="col-span-1"
                 />
                 <MetricCard
                     title="七天内收益率"
+                    subtitle="累计收益差（费前）*份额/日均资金占用"
                     value={data.weeklyReturn}
                     format="percent"
                     className="col-span-1"
                 />
                 <MetricCard
                     title="本年收益率"
+                    subtitle="费后收益/日均资金占用"
                     value={data.annualReturn}
                     format="percent"
                     className="col-span-1"
@@ -236,7 +252,12 @@ export function OverviewModule({
                                         }`}
                                 >
                                     <span className="mr-1">{f.daily_pnl > 0 ? '📈' : '📉'}</span>
-                                    <span>{f.name} ({formatCurrency(f.daily_pnl)})</span>
+                                    <span>
+                                        {f.daily_pnl > 0
+                                            ? `当日大额盈利: ${f.name} (+${formatCurrency(f.daily_pnl)})`
+                                            : `当日大额亏损: ${f.name} (${formatCurrency(f.daily_pnl)})`
+                                        }
+                                    </span>
                                 </div>
                             ))}
 

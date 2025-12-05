@@ -38,17 +38,29 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
             if (!fundsJson.success) throw new Error(fundsJson.error || 'Failed to fetch funds')
 
-            // Process Funds Data (similar to what was in page.tsx)
+            // Process Funds Data
             const { funds, strategyStats, managerStats } = fundsJson.data
 
             // Calculate Overview Metrics
             const normalFunds = funds.filter((f: any) => f.status !== '已赎回')
+
+            // 总规模 = 正常基金的成本之和
             const totalAssets = normalFunds.reduce((sum: number, f: any) => sum + (f.cost || 0), 0)
+
+            // 总日均资金占用 = 所有基金的日均资金占用之和（与飞书一致，包含已赎回）
             const totalDailyCapitalUsage = funds.reduce((sum: number, f: any) => sum + (f.daily_capital_usage || 0), 0)
+
+            // 今日收益 = 正常基金的日盈亏之和
             const todayReturn = normalFunds.reduce((sum: number, f: any) => sum + (f.daily_pnl || 0), 0)
-            const totalWeeklyPnl = normalFunds.reduce((sum: number, f: any) => sum + (f.weekly_pnl || 0), 0)
-            const weeklyReturn = totalAssets ? totalWeeklyPnl / totalAssets : 0
+
+            // 七天内收益率 = 本周收益合计 / 日均资金占用合计（包括已赎回）
+            const totalWeeklyPnl = funds.reduce((sum: number, f: any) => sum + (f.weekly_pnl || 0), 0)
+            const weeklyReturn = totalDailyCapitalUsage ? totalWeeklyPnl / totalDailyCapitalUsage : 0
+
+            // 本年收益 = 所有基金的本年收益之和（与飞书一致，包含已赎回）
             const totalYearlyPnl = funds.reduce((sum: number, f: any) => sum + (f.yearly_pnl || 0), 0)
+
+            // 本年收益率 = 本年收益 / 日均资金占用
             const annualReturn = totalDailyCapitalUsage ? totalYearlyPnl / totalDailyCapitalUsage : 0
 
             // Map strategy stats

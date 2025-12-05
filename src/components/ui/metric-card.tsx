@@ -2,6 +2,7 @@ import { cn, formatCurrency, formatPercent, getColorByValue } from '@/lib/utils'
 
 interface MetricCardProps {
   title: string
+  subtitle?: string
   value: string | number
   change?: number
   changeLabel?: string
@@ -11,6 +12,7 @@ interface MetricCardProps {
 
 export function MetricCard({
   title,
+  subtitle,
   value,
   change,
   changeLabel = '较昨日',
@@ -37,7 +39,12 @@ export function MetricCard({
       className
     )}>
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-gray-600">{title}</p>
+        <div>
+          <p className="text-xs font-medium text-gray-600">{title}</p>
+          {subtitle && (
+            <p className="text-[10px] text-gray-400">{subtitle}</p>
+          )}
+        </div>
         {change !== undefined && (
           <span className={cn(
             'text-xs font-medium',

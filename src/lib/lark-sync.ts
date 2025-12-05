@@ -4,7 +4,7 @@ import { getDatabase } from './database-server'
 
 interface SyncConfig {
   appToken: string
-  tables?: Array<{ id: string; type: 'main' | 'fof' }>
+  tables?: Array<{ id: string; type: 'main' | 'fof' | 'basic_pool' }>
   tableId?: string
   autoDetectTable?: boolean
 }
@@ -56,7 +56,8 @@ export class LarkSyncService {
         tablesToSync = [
           { id: 'tblcXqDbfgA0x533', type: 'main' }, // 私募取数表 (Primary data source)
           { id: 'tblcK2mWFtgob3Dg', type: 'main' }, // 私募盈亏一览表 (For concentration field)
-          { id: 'tblXwpq4lQzfymME', type: 'fof' }   // 第一创业FOF
+          { id: 'tblXwpq4lQzfymME', type: 'fof' },  // 第一创业FOF
+          { id: 'tblx87kYtZf70vOf', type: 'basic_pool' }  // 基础池产品
         ]
       }
 
@@ -107,6 +108,15 @@ export class LarkSyncService {
             console.log('同步历史净值数据...')
             const historyResult = await this.syncNavHistory(records)
             console.log(`历史数据同步完成: ${historyResult.inserted} 条记录`)
+          }
+
+          // 基础池产品表：同步到专用历史表
+          if (table.id === 'tblx87kYtZf70vOf') {
+            console.log('同步基础池产品历史数据...')
+            const basicPoolResult = await this.syncBasicPoolHistory(records)
+            console.log(`基础池数据同步完成: ${basicPoolResult.inserted} 条记录`)
+            // 基础池只做历史同步，不走标准的基金数据转换流程
+            continue
           }
 
           // 转换数据格式
@@ -194,6 +204,10 @@ export class LarkSyncService {
 
     try {
       for (const fund of fundData) {
+        if (fund.id === 'recv3I1t4PnLo6') {
+          console.log(`[DEBUG] Processing Target Fund in saveToDatabase: Name=${JSON.stringify(fund.name)}, Strategy=${fund.strategy}`);
+        }
+
         // 检查基金是否已存在
         const existingFund = await this.findExistingFund(db, fund.name, fund.manager)
 
@@ -237,6 +251,9 @@ export class LarkSyncService {
         'SELECT id, manager FROM funds WHERE name = ?',
         [name],
         (err: Error | null, rows: any[]) => {
+          if (name.includes('永利')) {
+            console.log(`[DEBUG] findExistingFund for ${name}: Found ${rows.length} rows`);
+          }
           if (err) { reject(err); return }
           if (rows.length === 0) { resolve(null); return }
           if (rows.length === 1) { resolve(rows[0]); return }
@@ -273,6 +290,11 @@ export class LarkSyncService {
       }
 
       addField('name', fund.name)
+
+      if (fund.name.includes('永利')) {
+        console.log(`[DEBUG] Updating Fund with '永利': Name=${JSON.stringify(fund.name)}, Strategy=${fund.strategy}, ID=${id}, FundID=${fund.id}`);
+      }
+
       addField('strategy', fund.strategy)
       addField('manager', fund.manager)
       addField('latest_nav_date', fund.latestNavDate?.toISOString())
@@ -457,13 +479,17 @@ export class LarkSyncService {
               const positionChange = this.parseNumber(fields['持仓变化'])
               const dailyPnl = this.parseNumber(fields['当日盈亏'])
 
+              if (fundName.includes('平方和衡盛36号')) {
+                console.log('DEBUG: Found Pingfang:', fundName, navDate, unitNav, virtualNav, cumulativeNav);
+              }
+
               if (!fundName || !navDate) continue
 
               stmt.run([
                 fundName, // 使用基金名称作为fund_id
                 navDate,
                 unitNav,
-                virtualNav, // 虚拟净值作为cumulative_nav
+                virtualNav || cumulativeNav || unitNav, // 优先使用虚拟净值，其次累计净值，最后单位净值
                 dailyReturn,
                 totalAssets,
                 status,
@@ -490,6 +516,97 @@ export class LarkSyncService {
         })
       })
     })
+  }
+
+  /**
+   * 同步基础池产品历史数据
+   */
+  private async syncBasicPoolHistory(records: any[]): Promise<{ inserted: number }> {
+    const db = getDatabase()
+    const dbInstance = (db as any).db
+    let inserted = 0
+
+    return new Promise((resolve, reject) => {
+      dbInstance.serialize(() => {
+        // 清空基础池历史数据表
+        dbInstance.run('DELETE FROM basic_pool_history', (err: Error | null) => {
+          if (err) {
+            console.error('清空基础池历史数据失败:', err)
+            reject(err)
+            return
+          }
+
+          const stmt = dbInstance.prepare(`
+            INSERT INTO basic_pool_history (
+              fund_name, strategy, nav_date, cumulative_nav, unit_nav
+            ) VALUES (?, ?, ?, ?, ?)
+          `)
+
+          for (const record of records) {
+            try {
+              const fields = record.fields
+              const fundName = this.extractTextValue(fields['基金名称']) || ''
+              const strategy = this.extractSelectValue(fields['策略']) || ''
+              const navDate = this.parseNavDate(fields['净值日期'])
+              const cumulativeNav = this.parseNumber(fields['累计净值'])
+              const unitNav = this.parseNumber(fields['单位净值']) || cumulativeNav
+
+              if (!fundName || !navDate) continue
+
+              stmt.run([
+                fundName,
+                strategy,
+                navDate,
+                cumulativeNav,
+                unitNav
+              ], (err: Error | null) => {
+                if (err) {
+                  console.error(`插入基础池历史数据失败 ${fundName}:`, err)
+                } else {
+                  inserted++
+                }
+              })
+            } catch (error) {
+              console.warn(`处理基础池记录失败:`, error)
+            }
+          }
+
+          stmt.finalize((err: Error | null) => {
+            if (err) reject(err)
+            else resolve({ inserted })
+          })
+        })
+      })
+    })
+  }
+
+  /**
+   * 提取文本字段值
+   */
+  private extractTextValue(value: any): string {
+    if (!value) return ''
+    if (typeof value === 'string') return value
+    if (Array.isArray(value) && value.length > 0) {
+      const first = value[0]
+      if (typeof first === 'string') return first
+      if (first && first.text) return first.text
+    }
+    return ''
+  }
+
+  /**
+   * 提取选择字段值
+   */
+  private extractSelectValue(value: any): string {
+    if (!value) return ''
+    if (typeof value === 'string') return value
+    if (value.type === 3 && Array.isArray(value.value)) {
+      return value.value[0] || ''
+    }
+    if (Array.isArray(value) && value.length > 0) {
+      return value[0]
+    }
+    return ''
   }
 
   /**

@@ -46,6 +46,12 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
             sourceFunds = dailyData
         }
 
+        // Filter out redeemed funds only for daily/weekly views
+        // For yearly view, include all products (including redeemed) as they contributed returns during the year
+        const activeFunds = timeRange === 'yearly'
+            ? sourceFunds
+            : sourceFunds.filter(f => f.status !== '已赎回')
+
         // Helper to get value based on time range
         const getValue = (fund: any) => {
             switch (timeRange) {
@@ -56,42 +62,69 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
         }
 
         if (viewType === 'product') {
-            data = sourceFunds
-                .filter(f => {
-                    if (f.status === '已赎回') return false
-                    return true
-                })
+            data = activeFunds
                 .map(f => ({
                     name: f.name,
                     value: getValue(f),
                     strategy: f.strategy,
                     manager: f.manager,
-                    latest_nav_date: f.latest_nav_date
+                    latest_nav_date: f.latest_nav_date,
+                    status: f.status
                 }))
                 .sort((a, b) => a.value - b.value)
         } else {
             // Aggregation for Strategy or Manager
-            const map = new Map<string, { totalValue: number, totalCost: number, count: number }>()
+            const map = new Map<string, { totalValue: number, totalCost: number, count: number, products: any[] }>()
 
-            sourceFunds.forEach(f => {
-                if (f.status === '已赎回') return
+            activeFunds.forEach(f => {
                 if (timeRange === 'daily' && selectedDate && (f.daily_pnl === undefined || f.daily_pnl === null)) return
 
                 const key = viewType === 'strategy' ? f.strategy : f.manager
                 if (!key) return
 
                 if (!map.has(key)) {
-                    map.set(key, { totalValue: 0, totalCost: 0, count: 0 })
+                    map.set(key, { totalValue: 0, totalCost: 0, count: 0, products: [] })
                 }
                 const entry = map.get(key)!
 
+                // Track product details for tooltip
+                entry.products.push({
+                    name: f.name,
+                    latest_nav_date: f.latest_nav_date,
+                    value: getValue(f),
+                    cost: f.cost || f.daily_capital_usage || 0
+                })
+
                 if (timeRange === 'daily') {
                     entry.totalValue += (f.daily_pnl || 0)
+                } else if (timeRange === 'weekly') {
+                    if (viewType === 'strategy') {
+                        // 策略视图: 加权平均收益率 (return * cost / cost)
+                        const cost = f.cost || 0
+                        const ret = f.weekly_return || 0
+                        entry.totalValue += ret * cost
+                        entry.totalCost += cost
+                    } else {
+                        // 投资经理视图: 本周收益 / 日均资金占用
+                        const capitalUsage = f.daily_capital_usage || 0
+                        const weeklyPnl = f.weekly_pnl || 0
+                        entry.totalValue += weeklyPnl
+                        entry.totalCost += capitalUsage
+                    }
                 } else {
-                    const cost = f.cost || 0
-                    const ret = timeRange === 'weekly' ? (f.weekly_return || 0) : (f.yearly_return || 0)
-                    entry.totalValue += ret * cost
-                    entry.totalCost += cost
+                    if (viewType === 'strategy') {
+                        // 策略视图: 加权平均收益率 (return * cost / cost)
+                        const cost = f.cost || f.daily_capital_usage || 0
+                        const ret = f.yearly_return || 0
+                        entry.totalValue += ret * cost
+                        entry.totalCost += cost
+                    } else {
+                        // 投资经理视图: 本年收益 / 日均资金占用
+                        const capitalUsage = f.daily_capital_usage || 0
+                        const yearlyPnl = f.yearly_pnl || 0
+                        entry.totalValue += yearlyPnl
+                        entry.totalCost += capitalUsage
+                    }
                 }
                 entry.count += 1
             })
@@ -103,7 +136,11 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
                 } else {
                     value = stats.totalCost > 0 ? stats.totalValue / stats.totalCost : 0
                 }
-                return { name, value }
+                return {
+                    name,
+                    value,
+                    products: stats.products.sort((a, b) => b.value - a.value)
+                }
             }).sort((a, b) => a.value - b.value)
         }
 
@@ -120,17 +157,75 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
         if (active && payload && payload.length) {
             const data = payload[0].payload
             const formatDate = (dateStr: string) => {
-                if (!dateStr) return ''
+                if (!dateStr) return '-'
                 if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr
-
-                // Use toLocaleDateString to match the Table's formatting and handle timezone consistently
-                // This ensures that if the Table shows 26th, the Chart also shows 26th
                 return new Date(dateStr).toLocaleDateString('zh-CN', {
                     year: 'numeric',
                     month: '2-digit',
                     day: '2-digit'
                 }).replace(/\//g, '-')
             }
+
+            // For strategy/manager view, show product details in multi-column layout
+            if ((viewType === 'strategy' || viewType === 'manager') && data.products) {
+                const productsPerColumn = 15
+                const numColumns = Math.ceil(data.products.length / productsPerColumn)
+                const columns: any[][] = []
+                for (let i = 0; i < numColumns; i++) {
+                    columns.push(data.products.slice(i * productsPerColumn, (i + 1) * productsPerColumn))
+                }
+
+                return (
+                    <div style={{
+                        backgroundColor: 'white',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        border: 'none',
+                        maxWidth: numColumns > 1 ? `${numColumns * 280}px` : '300px'
+                    }}>
+                        <p style={{ color: '#333', fontWeight: 'bold', marginBottom: '8px', fontSize: '14px' }}>{data.name}</p>
+                        <p style={{ color: '#666', margin: '4px 0', borderBottom: '1px solid #eee', paddingBottom: '8px' }}>
+                            {timeRange === 'daily' ? '总收益' : '加权收益率'}: <span style={{ fontWeight: 'bold', color: data.value >= 0 ? '#ef4444' : '#22c55e' }}>{formatValue(data.value)}</span>
+                        </p>
+                        <p style={{ color: '#999', fontSize: '11px', marginTop: '8px', marginBottom: '4px' }}>包含产品 ({data.products.length}个):</p>
+                        <div style={{ display: 'flex', gap: '16px' }}>
+                            {columns.map((column, colIndex) => (
+                                <div key={colIndex} style={{ flex: 1, minWidth: '250px' }}>
+                                    {column.map((product: any, index: number) => (
+                                        <div key={index} style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            padding: '2px 0',
+                                            borderBottom: index < column.length - 1 ? '1px solid #f5f5f5' : 'none',
+                                            fontSize: '11px'
+                                        }}>
+                                            <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                <span style={{ color: '#333' }}>{product.name}</span>
+                                                <span style={{ color: '#aaa', marginLeft: '4px', fontSize: '9px' }}>
+                                                    ({formatDate(product.latest_nav_date)})
+                                                </span>
+                                            </div>
+                                            <span style={{
+                                                fontWeight: 'bold',
+                                                color: product.value >= 0 ? '#ef4444' : '#22c55e',
+                                                marginLeft: '6px',
+                                                flexShrink: 0,
+                                                fontSize: '11px'
+                                            }}>
+                                                {formatValue(product.value)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )
+            }
+
+            // For product view
             return (
                 <div style={{
                     backgroundColor: 'white',
@@ -227,6 +322,15 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
                 </div>
             </CardHeader>
             <CardContent>
+                {/* 计算说明 */}
+                <div className="text-xs text-gray-400 mb-2 text-right">
+                    {viewType === 'product' && '基于累计净值计算（费前）'}
+                    {viewType === 'strategy' && timeRange !== 'yearly' && '基于累计净值（费前）*份额计算'}
+                    {viewType === 'strategy' && timeRange === 'yearly' && '基于累计净值计算（费前）'}
+                    {viewType === 'manager' && timeRange === 'daily' && '基于累计净值（费前）*份额计算'}
+                    {viewType === 'manager' && timeRange === 'weekly' && '基于累计净值差（费前）*份额/日均资金占用计算'}
+                    {viewType === 'manager' && timeRange === 'yearly' && '基于（虚拟净值（费后）*份额-成本）/日均资金占用计算'}
+                </div>
                 <div className="h-[400px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart

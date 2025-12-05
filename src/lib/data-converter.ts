@@ -378,6 +378,16 @@ export class DataConverter {
           }
 
           // 对于策略字段，使用临时映射
+          if (targetKey === 'strategy') {
+            console.log(`[DEBUG] Strategy Parsing: Value=${JSON.stringify(value)}, Extracted=${extractedValue}`);
+            if (this.strategyOptionMapping[extractedValue]) {
+              console.log(`[DEBUG] Mapping strategy ID ${extractedValue} to ${this.strategyOptionMapping[extractedValue]}`);
+              return this.strategyOptionMapping[extractedValue]
+            } else {
+              console.log(`[DEBUG] No mapping found for strategy ID ${extractedValue}`);
+            }
+          }
+
           if (targetKey === 'strategy' && this.strategyOptionMapping[extractedValue]) {
             console.log(`Mapping strategy ID ${extractedValue} to ${this.strategyOptionMapping[extractedValue]}`);
             return this.strategyOptionMapping[extractedValue]

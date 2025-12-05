@@ -355,11 +355,17 @@ async function scrapeData(url) {
 }
 
 function saveRecords(records) {
-    // Clear old records before inserting new ones
-    console.log('🗑️  Clearing old records...');
-    const deleteStmt = db.prepare('DELETE FROM external_monitor');
-    const deleteResult = deleteStmt.run();
-    console.log(`   Deleted ${deleteResult.changes} old records`);
+    // Check existing records count
+    const existingCount = db.prepare('SELECT COUNT(*) as c FROM external_monitor').get().c;
+    console.log(`📊 Current records in database: ${existingCount}`);
+
+    // Use INSERT OR IGNORE - duplicates will be ignored based on unique constraint
+    // First, let's add a unique index if not exists
+    try {
+        db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_monitor_date_title ON external_monitor(date, title)');
+    } catch (e) {
+        // Index may already exist
+    }
 
     const stmt = db.prepare(`
         INSERT OR IGNORE INTO external_monitor (
@@ -388,7 +394,9 @@ function saveRecords(records) {
             console.error(`Error inserting record:`, error.message);
         }
     }
-    console.log(`💾 Inserted ${insertedCount} new records into database`);
+
+    const newTotal = db.prepare('SELECT COUNT(*) as c FROM external_monitor').get().c;
+    console.log(`💾 Added ${insertedCount} new records (Total: ${newTotal})`);
     return insertedCount;
 }
 

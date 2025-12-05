@@ -1,67 +1,56 @@
 import sqlite3 from 'sqlite3'
-import { join } from 'path'
-
-const DB_PATH = join(process.cwd(), 'data', 'funds.db')
+import path from 'path'
 
 export class Database {
   private db: sqlite3.Database
 
   constructor() {
-    this.db = new sqlite3.Database(DB_PATH)
-    this.initTables()
+    const dbPath = process.env.DATABASE_PATH || path.join(process.cwd(), 'data/funds.db')
+    this.db = new sqlite3.Database(dbPath)
+    this.init()
   }
 
-  private initTables() {
-    // 基金基本信息表 - 更新为新的列结构
+  init() {
+    // 创建基金表
     this.db.run(`
       CREATE TABLE IF NOT EXISTS funds (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         record_id TEXT UNIQUE,
-        name TEXT NOT NULL,
+        name TEXT,
         strategy TEXT,
         manager TEXT,
-        latest_nav_date DATE,
-
-        -- 新的收益率字段
-        weekly_return REAL DEFAULT 0,
-        daily_return REAL DEFAULT 0,
-        daily_pnl REAL DEFAULT 0,
-        yearly_return REAL DEFAULT 0,
-        cumulative_return REAL DEFAULT 0,
-        annualized_return REAL DEFAULT 0,
-
-        -- 新的集中度和成本字段
-        concentration REAL DEFAULT 0,
-        cost REAL DEFAULT 0,
-        total_assets REAL DEFAULT 0,
-        standing_assets REAL DEFAULT 0,
-        cash_allocation REAL DEFAULT 0,
-
-        -- 状态字段
-        status TEXT DEFAULT '正常',
-
-        -- 需要计算的字段
-        max_drawdown REAL DEFAULT 0,
-        sharpe_ratio REAL DEFAULT 0,
-        volatility REAL DEFAULT 0,
-
-        -- 保留字段
-        establishment_date DATE,
-        scale REAL DEFAULT 0,
+        latest_nav_date DATETIME,
+        cumulative_return REAL,
+        annualized_return REAL,
+        max_drawdown REAL,
+        sharpe_ratio REAL,
+        volatility REAL,
+        total_assets REAL,
+        standing_assets REAL,
+        cash_allocation REAL,
+        status TEXT,
+        establishment_date DATETIME,
+        cost REAL,
+        scale REAL,
+        weekly_return REAL,
+        daily_return REAL,
+        daily_pnl REAL,
+        concentration REAL,
         source_table TEXT DEFAULT 'main',
-
-        -- 时间戳
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        daily_capital_usage REAL,
+        weekly_pnl REAL,
+        yearly_pnl REAL,
+        yearly_return REAL,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `)
 
-    // 基金净值历史表
+    // 创建净值历史表
     this.db.run(`
       CREATE TABLE IF NOT EXISTS fund_nav_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         fund_id TEXT,
-        nav_date DATE,
+        nav_date DATETIME,
         unit_nav REAL,
         cumulative_nav REAL,
         daily_return REAL,
@@ -71,23 +60,34 @@ export class Database {
         cost REAL,
         market_value REAL,
         position_change REAL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (fund_id) REFERENCES funds (id)
+        daily_pnl REAL
       )
     `)
 
-    // 数据同步日志表
+    // 创建同步日志表
     this.db.run(`
       CREATE TABLE IF NOT EXISTS sync_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        sync_type TEXT,
         status TEXT,
         records_processed INTEGER,
         records_updated INTEGER,
-        error_message TEXT,
+        records_inserted INTEGER,
+        errors TEXT,
         sync_start DATETIME,
         sync_end DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+
+    // 创建市场指数表
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS market_indices (
+        date TEXT,
+        code TEXT,
+        name TEXT,
+        close REAL,
+        change_pct REAL,
+        PRIMARY KEY (date, code)
       )
     `)
 
@@ -95,6 +95,7 @@ export class Database {
     this.db.run('CREATE INDEX IF NOT EXISTS idx_fund_nav_date ON fund_nav_history (fund_id, nav_date)')
     this.db.run('CREATE INDEX IF NOT EXISTS idx_fund_strategy ON funds (strategy)')
     this.db.run('CREATE INDEX IF NOT EXISTS idx_fund_manager ON funds (manager)')
+    this.db.run('CREATE INDEX IF NOT EXISTS idx_market_indices_date ON market_indices (date)')
   }
 
   // 基金相关操作
@@ -149,6 +150,34 @@ export class Database {
         if (err) reject(err)
         else resolve(rows)
       })
+    })
+  }
+
+  // 市场指数相关操作
+  async getMarketIndices(startDate: string = '2025-01-01'): Promise<any[]> {
+    return new Promise((resolve, reject) => {
+      this.db.all(`
+        SELECT * FROM market_indices
+        WHERE date >= ?
+        ORDER BY date ASC
+      `, [startDate], (err, rows) => {
+        if (err) reject(err)
+        else resolve(rows)
+      })
+    })
+  }
+
+  async insertMarketIndex(data: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const stmt = this.db.prepare(`
+        INSERT OR REPLACE INTO market_indices (date, code, name, close, change_pct)
+        VALUES (?, ?, ?, ?, ?)
+      `)
+      stmt.run([data.date, data.code, data.name, data.close, data.change_pct], (err) => {
+        if (err) reject(err)
+        else resolve()
+      })
+      stmt.finalize()
     })
   }
 
@@ -300,12 +329,13 @@ export class Database {
         SELECT 
           h.nav_date as date,
           h.cumulative_nav,
+          h.daily_return,
           h.fund_id,
           f.strategy,
           f.name
         FROM fund_nav_history h
         JOIN funds f ON (h.fund_id = f.record_id OR h.fund_id = f.name)
-        WHERE h.nav_date >= ? AND f.status != '已赎回'
+        WHERE h.nav_date >= ?
         ORDER BY h.nav_date ASC
       `, [startDate], (err, rows) => {
         if (err) reject(err)

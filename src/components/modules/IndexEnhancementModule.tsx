@@ -209,7 +209,7 @@ export function IndexEnhancementModule() {
           if (strategy.includes('300')) benchmarkCode = '000300.SH'
           else if (strategy.includes('500')) benchmarkCode = '000905.SH'
           else if (strategy.includes('1000')) benchmarkCode = '000852.SH'
-          else if (strategy.includes('2000')) benchmarkCode = '932000.SH'
+          else if (strategy.includes('2000')) benchmarkCode = '932000.CSI'
           else benchmarkCode = '000905.SH'
 
           const indexSeries = series[`index_${benchmarkCode}`]
@@ -351,19 +351,19 @@ export function IndexEnhancementModule() {
       if (fundData.length === 0) return null
 
       return (
-        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg text-sm max-h-[300px] overflow-y-auto">
-          <p className="font-semibold mb-2 text-gray-700">{label}</p>
-          <div className="space-y-1">
+        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg text-xs max-w-[500px]">
+          <p className="font-semibold mb-2 text-gray-700 text-sm">{label}</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             {fundData.map((entry: any, index: number) => (
-              <div key={index} className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
+              <div key={index} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1 min-w-0">
                   <div
-                    className="w-2 h-2 rounded-full"
+                    className="w-2 h-2 rounded-full flex-shrink-0"
                     style={{ backgroundColor: entry.color }}
                   />
-                  <span className="text-gray-600 truncate max-w-[150px]">{entry.name}</span>
+                  <span className="text-gray-600 truncate">{entry.name}</span>
                 </div>
-                <span className="font-medium font-mono" style={{ color: entry.color }}>
+                <span className="font-medium font-mono flex-shrink-0" style={{ color: entry.color }}>
                   {formatPercent(entry.value)}
                 </span>
               </div>
@@ -542,6 +542,24 @@ export function IndexEnhancementModule() {
                 ))}
               </LineChart>
             </ResponsiveContainer>
+          </div>
+          {/* Horizontal Legend - wrapping */}
+          <div className="flex flex-wrap gap-x-4 gap-y-2 mt-4 px-2 justify-center text-xs sm:text-sm">
+            {viewMode === 'nav' && selectedStrategy !== 'all' && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-6 border-t-2 border-dashed border-gray-500"></span>
+                <span className="text-gray-600">指数</span>
+              </div>
+            )}
+            {filteredFunds.map((p, i) => (
+              <div key={p.id} className="flex items-center gap-1.5 whitespace-nowrap">
+                <span
+                  className="w-4 h-0.5 rounded-full"
+                  style={{ backgroundColor: `hsl(${i * 60 + 200}, 70%, 50%)` }}
+                ></span>
+                <span className="text-gray-700 truncate max-w-[120px]" title={p.name}>{shortenFundName(p.name)}</span>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

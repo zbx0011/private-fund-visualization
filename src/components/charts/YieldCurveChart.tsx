@@ -50,7 +50,7 @@ const CustomTooltip = ({ active, payload, label, series }: any) => {
                 {new Date(label).toLocaleDateString('zh-CN')}
             </p>
             <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>
-                累计收益率
+                年度收益率
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {validPayload.map((entry: any, index: number) => {
@@ -134,7 +134,7 @@ export function YieldCurveChart({ data, series }: YieldCurveChartProps) {
                         tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
                         tick={{ fontSize: 12 }}
                         stroke="#6b7280"
-                        domain={[0, 'auto']}
+                        domain={['auto', 'auto']}
                     />
                     <Tooltip content={<CustomTooltip series={series} />} />
                     {series.map((s) => (

@@ -78,24 +78,26 @@ export function StrategyDistributionChart({ data }: StrategyDistributionChartPro
         )
     }
 
+    // Use type assertion for the entire Pie component props
+    const pieProps: any = {
+        activeIndex: activeIndex,
+        activeShape: renderActiveShape,
+        data: data,
+        cx: "50%",
+        cy: "50%",
+        innerRadius: 80,
+        outerRadius: 110,
+        fill: "#8884d8",
+        dataKey: "value",
+        onMouseEnter: onPieEnter,
+        paddingAngle: 2
+    }
+
     return (
         <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                    <Pie
-                        // @ts-ignore
-                        activeIndex={activeIndex}
-                        activeShape={renderActiveShape}
-                        data={data}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={80}
-                        outerRadius={110}
-                        fill="#8884d8"
-                        dataKey="value"
-                        onMouseEnter={onPieEnter}
-                        paddingAngle={2}
-                    >
+                    <Pie {...pieProps}>
                         {data.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
                         ))}

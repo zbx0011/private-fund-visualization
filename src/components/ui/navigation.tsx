@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState } from 'react'
 import Link from 'next/link'
@@ -23,7 +23,7 @@ const navigationItems = [
   { href: '/', label: '总览仪表盘', icon: TrendingUp },
   { href: '/products', label: '产品数据', icon: ClipboardList },
   { href: '/monitor', label: '外部信息监控', icon: Search },
-  { href: '/settings', label: '设置', icon: Settings },
+  { href: '/index-enhancement', label: '基础池指增绩效', icon: LineChart },
 ]
 
 export function Navigation() {
@@ -116,8 +116,8 @@ export function Navigation() {
       </nav>
 
       {/* Bottom Navigation for Mobile */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
-        <div className="grid grid-cols-4 gap-0">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-inset-bottom">
+        <div className="flex justify-around items-center w-full">
           {navigationItems.map((item) => {
             const Icon = item.icon
             return (
@@ -125,14 +125,14 @@ export function Navigation() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex flex-col items-center justify-center py-2 px-1 text-xs',
+                  'flex-1 flex flex-col items-center justify-center py-2 text-[10px] sm:text-xs max-w-[80px]',
                   pathname === item.href
                     ? 'text-blue-600'
                     : 'text-gray-500 hover:text-gray-700'
                 )}
               >
-                <Icon className="h-5 w-5 mb-1" />
-                <span className="truncate">{item.label}</span>
+                <Icon className="h-5 w-5 mb-0.5" />
+                <span className="truncate text-center leading-tight">{item.label}</span>
               </Link>
             )
           })}

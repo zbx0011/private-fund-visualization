@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ExternalLink } from 'lucide-react'
 
 interface ExternalMonitorData {
@@ -26,7 +26,7 @@ export function ExternalMonitorModule() {
 
     const fetchData = async () => {
         try {
-            const response = await fetch('/api/monitor')
+            const response = await fetch('/api/monitor?limit=500')
             const result = await response.json()
             if (result.success) {
                 setMonitorData(result.data)
@@ -53,16 +53,16 @@ export function ExternalMonitorModule() {
 
     const renderLatestView = () => (
         <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-sm text-left table-fixed">
                 <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
                     <tr>
-                        <th className="px-2 py-1 font-medium text-xs">更新日期</th>
-                        <th className="px-2 py-1 font-medium text-xs">标题</th>
-                        <th className="px-2 py-1 font-medium text-xs">关联企业</th>
-                        <th className="px-2 py-1 font-medium text-xs">事件类型</th>
-                        <th className="px-2 py-1 font-medium text-xs">重要性</th>
-                        <th className="px-2 py-1 font-medium text-xs">正负面</th>
-                        <th className="px-2 py-1 font-medium text-xs">来源</th>
+                        <th style={{ width: '85px' }} className="px-2 py-1 font-medium text-xs">更新日期</th>
+                        <th style={{ width: '45%' }} className="px-2 py-1 font-medium text-xs">标题</th>
+                        <th style={{ width: '80px' }} className="px-2 py-1 font-medium text-xs">关联企业</th>
+                        <th style={{ width: '100px' }} className="px-2 py-1 font-medium text-xs">事件类型</th>
+                        <th style={{ width: '50px' }} className="px-2 py-1 font-medium text-xs text-center">重要性</th>
+                        <th style={{ width: '50px' }} className="px-2 py-1 font-medium text-xs text-center">正负面</th>
+                        <th style={{ width: '100px' }} className="px-2 py-1 font-medium text-xs">来源</th>
                     </tr>
                 </thead>
                 <tbody className="text-xs">
@@ -85,15 +85,19 @@ export function ExternalMonitorModule() {
                                     {item.date}
                                 </td>
                                 <td className="px-2 py-1 font-medium text-gray-900">
-                                    <a
-                                        href={item.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="hover:text-blue-600 hover:underline flex items-center group"
-                                    >
-                                        {item.title}
-                                        <ExternalLink className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </a>
+                                    {item.url ? (
+                                        <a
+                                            href={item.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:text-blue-800 hover:underline flex items-center group"
+                                        >
+                                            {item.title}
+                                            <ExternalLink className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </a>
+                                    ) : (
+                                        <span className="text-gray-700">{item.title}</span>
+                                    )}
                                 </td>
                                 <td className="px-2 py-1 text-gray-600">{item.related_enterprise}</td>
                                 <td className="px-2 py-1">
@@ -240,9 +244,7 @@ export function ExternalMonitorModule() {
                     <div className="text-sm text-gray-500 pb-2">
                         {monitorData.length > 0 && (
                             <>
-                                (数据更新于: {
-                                    [...monitorData].sort((a, b) => b.date.localeCompare(a.date))[0]?.date || '-'
-                                })
+                                (数据更新于: {new Date().toLocaleDateString('zh-CN')})
                             </>
                         )}
                     </div>

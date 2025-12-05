@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
         })
 
         // Convert Strategy Map to Chart Data Array
-        const strategyChartData = Array.from(strategyWeeklyMap.entries())
+        const rawStrategyChartData = Array.from(strategyWeeklyMap.entries())
             .map(([date, strategies]) => {
                 const point: any = { date }
                 strategies.forEach((stats, strategy) => {
@@ -139,6 +139,34 @@ export async function GET(request: NextRequest) {
                 return point
             })
             .sort((a, b) => a.date.localeCompare(b.date))
+
+        // Normalize: Find baseline (first value) for each strategy and subtract it
+        const strategyBaselines = new Map<string, number>()
+        if (rawStrategyChartData.length > 0) {
+            const firstPoint = rawStrategyChartData[0]
+            Object.keys(firstPoint).forEach(key => {
+                if (key !== 'date' && !key.endsWith('_yearly')) {
+                    strategyBaselines.set(key, firstPoint[key] || 0)
+                }
+            })
+        }
+
+        // Apply normalization to all data points
+        const strategyChartData = rawStrategyChartData.map(point => {
+            const normalizedPoint: any = { date: point.date }
+            Object.keys(point).forEach(key => {
+                if (key === 'date') return
+                if (key.endsWith('_yearly')) {
+                    const baseKey = key.replace('_yearly', '')
+                    const baseline = strategyBaselines.get(baseKey) || 0
+                    normalizedPoint[key] = point[key] - baseline
+                } else {
+                    const baseline = strategyBaselines.get(key) || 0
+                    normalizedPoint[key] = point[key] - baseline
+                }
+            })
+            return normalizedPoint
+        })
 
         // Build Strategy Series
         const strategySeries = Array.from(new Set(funds.map((f: any) => f.strategy).filter(Boolean)))

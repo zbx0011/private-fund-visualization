@@ -23,6 +23,7 @@ export function ProductDataModule({ funds, loading, lastSyncTime }: ProductDataM
         { key: 'latest_nav_date', label: '最新净值日期', sortable: true, format: (v: string) => new Date(v).toLocaleDateString('zh-CN') },
         { key: 'daily_pnl', label: '本日收益', sortable: true, format: (v: number) => formatCurrency(v) },
         { key: 'weekly_return', label: '七天内收益率', sortable: true, format: (v: number) => formatPercent(v) },
+        { key: 'yearly_pnl', label: '本年收益', sortable: true, format: (v: number) => formatCurrency(v) },
         { key: 'yearly_return', label: '本年收益率', sortable: true, format: (v: number) => formatPercent(v) },
         { key: 'concentration', label: '集中度', sortable: true, format: (v: number) => v ? formatPercentUnsigned(v) : '-' },
         { key: 'cost', label: '成本', sortable: true, format: (v: number) => formatCurrency(v) },
@@ -62,10 +63,12 @@ export function ProductDataModule({ funds, loading, lastSyncTime }: ProductDataM
     // Calculate totals for footer row
     const totalDailyPnl = filteredFunds.reduce((sum, fund) => sum + (fund.daily_pnl || 0), 0)
     const totalCost = filteredFunds.reduce((sum, fund) => sum + (fund.cost || 0), 0)
+    const totalYearlyPnl = filteredFunds.reduce((sum, fund) => sum + (fund.yearly_pnl || 0), 0)
 
     const footerRow = {
         name: '合计',
         daily_pnl: totalDailyPnl,
+        yearly_pnl: totalYearlyPnl,
         cost: totalCost,
         // Other fields are null/undefined and will display as '-' or empty based on formatters
         // We might need to adjust formatters to handle undefined gracefully if they don't already
@@ -77,12 +80,13 @@ export function ProductDataModule({ funds, loading, lastSyncTime }: ProductDataM
 
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900">
-                    基金产品数据
+            {/* Header Section - Mobile Responsive */}
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                <div>
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 whitespace-nowrap">基金产品数据</h2>
                     {lastSyncTime && (
-                        <span className="text-sm font-normal text-gray-500 ml-2">
-                            (数据更新于: {new Date(lastSyncTime).toLocaleString('zh-CN', {
+                        <p className="text-xs text-gray-500 mt-1">
+                            数据更新于: {new Date(lastSyncTime).toLocaleString('zh-CN', {
                                 year: 'numeric',
                                 month: '2-digit',
                                 day: '2-digit',
@@ -90,19 +94,17 @@ export function ProductDataModule({ funds, loading, lastSyncTime }: ProductDataM
                                 minute: '2-digit',
                                 second: '2-digit',
                                 hour12: false
-                            }).replace(/\//g, '/').replace(/,/g, '')})
-                        </span>
+                            }).replace(/\//g, '/').replace(/,/g, '')}
+                        </p>
                     )}
-                    <span className="text-xs font-normal text-blue-600 ml-3">
-                        (点击产品名称可查看收益率曲线图)
-                    </span>
-                </h2>
-                <div className="flex items-center space-x-4">
-                    <div className="relative">
+                    <p className="text-xs text-blue-600 mt-0.5">(点击产品名称可查看收益率曲线图)</p>
+                </div>
+                <div className="flex items-center gap-2 sm:gap-4">
+                    <div className="relative flex-1 sm:flex-none">
                         <input
                             type="text"
                             placeholder="搜索基金、经理或策略..."
-                            className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full sm:w-auto pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -121,7 +123,7 @@ export function ProductDataModule({ funds, loading, lastSyncTime }: ProductDataM
                             />
                         </svg>
                     </div>
-                    <span className="text-sm text-gray-500">共 {filteredFunds.length} 只产品</span>
+                    <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">共 {filteredFunds.length} 只</span>
                 </div>
             </div>
 
