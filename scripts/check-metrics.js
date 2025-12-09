@@ -1,49 +1,60 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const Database = require('better-sqlite3')
+const db = new Database('./data/funds.db')
 
-const dbPath = path.join(__dirname, '..', 'data', 'funds.db');
-const db = new sqlite3.Database(dbPath);
+console.log('=== 数据库指标检查 ===\n')
 
-console.log('=== Checking Fund Metrics ===\n');
+// 获取所有非FOF的产品
+const funds = db.prepare(`
+    SELECT name, status, cost, daily_capital_usage, daily_pnl, weekly_pnl, yearly_pnl, yearly_return, weekly_return
+    FROM funds 
+    WHERE source_table IN ('main', 'merged')
+`).all()
 
-db.all(`
-  SELECT 
-    name,
-    max_drawdown,
-    sharpe_ratio,
-    volatility,
-    weekly_return,
-    yearly_return
-  FROM funds
-  WHERE source_table = 'main'
-  ORDER BY name
-  LIMIT 10
-`, (err, rows) => {
-    if (err) {
-        console.error('Error:', err);
-        return;
-    }
+console.log(`总产品数: ${funds.length}`)
 
-    console.log('Sample Records:');
-    console.table(rows);
+const normalFunds = funds.filter(f => f.status !== '已赎回')
+console.log(`正常产品数 (排除已赎回): ${normalFunds.length}`)
 
-    // Count non-zero values
-    db.all(`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN max_drawdown IS NOT NULL AND max_drawdown != 0 THEN 1 END) as max_drawdown_populated,
-        COUNT(CASE WHEN sharpe_ratio IS NOT NULL AND sharpe_ratio != 0 THEN 1 END) as sharpe_populated,
-        COUNT(CASE WHEN volatility IS NOT NULL AND volatility != 0 THEN 1 END) as volatility_populated
-      FROM funds
-      WHERE source_table = 'main'
-    `, (err2, counts) => {
-        if (err2) {
-            console.error('Error:', err2);
-            return;
-        }
+// 计算各项指标
+const totalCost = normalFunds.reduce((sum, f) => sum + (f.cost || 0), 0)
+const totalDailyCapitalUsage = funds.reduce((sum, f) => sum + (f.daily_capital_usage || 0), 0)
+const todayReturn = normalFunds.reduce((sum, f) => sum + (f.daily_pnl || 0), 0)
+const totalWeeklyPnl = normalFunds.reduce((sum, f) => sum + (f.weekly_pnl || 0), 0)
+const totalYearlyPnl = funds.reduce((sum, f) => sum + (f.yearly_pnl || 0), 0)
 
-        console.log('\nMetrics Population:');
-        console.table(counts);
-        db.close();
-    });
-});
+console.log('\n--- 当前计算方式 ---')
+console.log(`总规模 (normalFunds的cost之和): ¥${totalCost.toLocaleString()}`)
+console.log(`总日均资金占用 (所有funds的daily_capital_usage之和): ¥${totalDailyCapitalUsage.toLocaleString()}`)
+console.log(`今日收益 (normalFunds的daily_pnl之和): ¥${todayReturn.toLocaleString()}`)
+console.log(`本周收益 (normalFunds的weekly_pnl之和): ¥${totalWeeklyPnl.toLocaleString()}`)
+console.log(`本年收益 (所有funds的yearly_pnl之和): ¥${totalYearlyPnl.toLocaleString()}`)
+
+const weeklyReturn = totalCost ? totalWeeklyPnl / totalCost : 0
+const annualReturn = totalDailyCapitalUsage ? totalYearlyPnl / totalDailyCapitalUsage : 0
+
+console.log(`\n七天内收益率 (weekly_pnl/cost): ${(weeklyReturn * 100).toFixed(2)}%`)
+console.log(`本年收益率 (yearly_pnl/daily_capital_usage): ${(annualReturn * 100).toFixed(2)}%`)
+
+// 检查正确的本年收益率计算: yearly_pnl / daily_capital_usage (只用正常基金)
+const normalDailyCapitalUsage = normalFunds.reduce((sum, f) => sum + (f.daily_capital_usage || 0), 0)
+const normalYearlyPnl = normalFunds.reduce((sum, f) => sum + (f.yearly_pnl || 0), 0)
+console.log(`\n--- 仅正常基金 ---`)
+console.log(`正常基金日均资金占用: ¥${normalDailyCapitalUsage.toLocaleString()}`)
+console.log(`正常基金本年收益: ¥${normalYearlyPnl.toLocaleString()}`)
+console.log(`本年收益率 (正常基金): ${((normalYearlyPnl / normalDailyCapitalUsage) * 100).toFixed(2)}%`)
+
+// 显示前10个产品详情
+console.log('\n--- 前10个产品详情 ---')
+console.log('名称 | 状态 | 成本 | 日均资金占用 | 本年收益 | 本年收益率')
+funds.slice(0, 10).forEach(f => {
+  console.log(`${f.name} | ${f.status || '正常'} | ¥${(f.cost || 0).toLocaleString()} | ¥${(f.daily_capital_usage || 0).toLocaleString()} | ¥${(f.yearly_pnl || 0).toLocaleString()} | ${((f.yearly_return || 0) * 100).toFixed(2)}%`)
+})
+
+// 检查已赎回产品
+const redeemedFunds = funds.filter(f => f.status === '已赎回')
+console.log(`\n--- 已赎回产品 (${redeemedFunds.length}个) ---`)
+redeemedFunds.forEach(f => {
+  console.log(`${f.name} | 日均资金占用: ¥${(f.daily_capital_usage || 0).toLocaleString()} | 本年收益: ¥${(f.yearly_pnl || 0).toLocaleString()}`)
+})
+
+db.close()
