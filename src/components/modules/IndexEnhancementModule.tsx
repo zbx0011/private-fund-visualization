@@ -69,9 +69,37 @@ export function IndexEnhancementModule() {
     fetchData()
   }, [])
 
+  // Dynamic strategies from data
+  const availableStrategies = useMemo(() => {
+    const strategies = Array.from(new Set(funds.map(f => f.strategy))).filter(Boolean).sort()
+    return strategies
+  }, [funds])
+
+  // Set default strategy when funds load
+  useEffect(() => {
+    if (availableStrategies.length > 0 && selectedStrategy === 'all') {
+      setSelectedStrategy(availableStrategies[0])
+    }
+  }, [availableStrategies, selectedStrategy])
+
+  // Helper for display names
+  // Display names mapping
+  const getStrategyDisplayName = (strategy: string) => {
+    if (strategy === 'Unknown') return '未分类'
+    if (strategy === '指数增强_沪深300') return '300指增'
+    if (strategy === '指数增强_中证500') return '500指增'
+    if (strategy === '指数增强_中证1000') return '1000指增'
+    if (strategy === '指数增强_中证2000') return '2000指增'
+    if (strategy === '指数增强_A500') return 'A500指增'
+    if (strategy === '指数增强_中证全指') return '全指指增'
+    if (strategy === '指数增强_中证红利') return '红利指增'
+    if (strategy === '指数增强_量化选股') return '量化选股'
+    return strategy.replace('指数增强_', '')
+  }
+
   // Filter products based on strategy
   const filteredFunds = useMemo(() => {
-    if (selectedStrategy === 'all') return funds
+    if (selectedStrategy === 'all') return []
     return funds.filter(p => p.strategy === selectedStrategy)
   }, [selectedStrategy, funds])
 
@@ -416,7 +444,7 @@ export function IndexEnhancementModule() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full lg:w-auto">
             <span className="text-sm sm:text-base font-semibold text-gray-700 whitespace-nowrap">策略筛选:</span>
             <div className="flex flex-wrap gap-1 sm:gap-2">
-              {strategies.map(s => (
+              {availableStrategies.map(s => (
                 <button
                   key={s}
                   onClick={() => setSelectedStrategy(s)}
@@ -425,7 +453,7 @@ export function IndexEnhancementModule() {
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                 >
-                  {s === 'all' ? '全部' : s}
+                  {getStrategyDisplayName(s)}
                 </button>
               ))}
             </div>

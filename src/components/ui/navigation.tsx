@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { useYear } from '@/contexts/YearContext'
 import {
   TrendingUp,
   BarChart3,
@@ -16,19 +17,27 @@ import {
   X,
   ClipboardList,
   Building2,
-  Search
+  Search,
+  Brain,
+  Activity,
+  Calendar,
+  LayoutDashboard,
+  Database
 } from 'lucide-react'
 
 const navigationItems = [
-  { href: '/', label: '总览仪表盘', icon: TrendingUp },
-  { href: '/products', label: '产品数据', icon: ClipboardList },
+  { href: '/', label: '总览仪表盘', icon: LayoutDashboard },
+  { href: '/products', label: '产品数据', icon: Database },
   { href: '/monitor', label: '外部信息监控', icon: Search },
-  { href: '/index-enhancement', label: '基础池指增绩效', icon: LineChart },
+  { href: '/basic-pool', label: '基础池基金', icon: LineChart },
+  { href: '/market-monitor', label: '行情监控', icon: Activity },
+  // { href: '/ai-analysis', label: 'AI分析(开发中)', icon: Brain }, // 暂时隐藏
 ]
 
 export function Navigation() {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { selectedYear, setSelectedYear, availableYears } = useYear()
 
   return (
     <>
@@ -41,6 +50,24 @@ export function Navigation() {
                 <TrendingUp className="h-8 w-8 text-blue-600" />
                 <span className="text-xl font-bold text-gray-900">私募管理系统</span>
               </Link>
+              {/* Year Selector */}
+              <div className="flex items-center ml-4 bg-gray-100 rounded-lg p-1">
+                <Calendar className="h-4 w-4 text-gray-500 ml-1 mr-1" />
+                {availableYears.map((year) => (
+                  <button
+                    key={year}
+                    onClick={() => setSelectedYear(year)}
+                    className={cn(
+                      'px-3 py-1 text-sm font-medium rounded-md transition-all',
+                      selectedYear === year
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-900'
+                    )}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="flex space-x-8">
               {navigationItems.map((item) => {
