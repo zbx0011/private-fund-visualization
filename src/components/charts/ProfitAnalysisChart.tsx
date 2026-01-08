@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { formatCurrency, formatPercent } from '@/lib/utils'
+import { useYear } from '@/contexts/YearContext'
 
 interface ProfitAnalysisChartProps {
     funds: any[]
@@ -18,6 +19,8 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
     const [timeRange, setTimeRange] = useState<TimeRange>('daily')
     const [selectedDate, setSelectedDate] = useState<string>('')
     const [dailyData, setDailyData] = useState<any[]>([])
+    const { selectedYear } = useYear()  // Use global year context
+    const [yearlyData, setYearlyData] = useState<any[]>([])
 
     // Fetch daily PnL data when a specific date is selected
     useEffect(() => {
@@ -35,6 +38,22 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
         }
     }, [selectedDate, timeRange])
 
+    // Fetch yearly return data when yearly view is selected
+    useEffect(() => {
+        if (timeRange === 'yearly') {
+            fetch(`/api/funds/yearly-return?year=${selectedYear}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && Array.isArray(data.data)) {
+                        setYearlyData(data.data)
+                    }
+                })
+                .catch(err => console.error('Failed to fetch yearly return:', err))
+        } else {
+            setYearlyData([])
+        }
+    }, [selectedYear, timeRange])
+
     const chartData = useMemo(() => {
         if (!funds || funds.length === 0) return []
 
@@ -44,6 +63,8 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
         let sourceFunds = funds
         if (timeRange === 'daily' && selectedDate && dailyData.length > 0) {
             sourceFunds = dailyData
+        } else if (timeRange === 'yearly' && yearlyData.length > 0) {
+            sourceFunds = yearlyData
         }
 
         // Filter out redeemed funds only for daily/weekly views
@@ -112,19 +133,11 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
                         entry.totalCost += capitalUsage
                     }
                 } else {
-                    if (viewType === 'strategy') {
-                        // 策略视图: 加权平均收益率 (return * cost / cost)
-                        const cost = f.cost || f.daily_capital_usage || 0
-                        const ret = f.yearly_return || 0
-                        entry.totalValue += ret * cost
-                        entry.totalCost += cost
-                    } else {
-                        // 投资经理视图: 本年收益 / 日均资金占用
-                        const capitalUsage = f.daily_capital_usage || 0
-                        const yearlyPnl = f.yearly_pnl || 0
-                        entry.totalValue += yearlyPnl
-                        entry.totalCost += capitalUsage
-                    }
+                    // 本年视图: 策略和投资经理都使用加权平均收益率 (return * cost / cost)
+                    const cost = f.cost || f.daily_capital_usage || 0
+                    const ret = f.yearly_return || 0
+                    entry.totalValue += ret * cost
+                    entry.totalCost += cost
                 }
                 entry.count += 1
             })
@@ -145,7 +158,7 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
         }
 
         return data
-    }, [funds, viewType, timeRange, selectedDate, dailyData])
+    }, [funds, viewType, timeRange, selectedDate, dailyData, yearlyData, selectedYear])
 
     const formatValue = (val: number) => {
         if (timeRange === 'daily') return formatCurrency(val)
@@ -329,7 +342,7 @@ export function ProfitAnalysisChart({ funds, lastSyncTime }: ProfitAnalysisChart
                     {viewType === 'strategy' && timeRange === 'yearly' && '基于累计净值计算（费前）'}
                     {viewType === 'manager' && timeRange === 'daily' && '基于累计净值（费前）*份额计算'}
                     {viewType === 'manager' && timeRange === 'weekly' && '基于累计净值差（费前）*份额/日均资金占用计算'}
-                    {viewType === 'manager' && timeRange === 'yearly' && '基于（虚拟净值（费后）*份额-成本）/日均资金占用计算'}
+                    {viewType === 'manager' && timeRange === 'yearly' && '基于（虚拟净值（费后）-成本）*份额/日均资金占用计算'}
                 </div>
                 <div className="h-[400px] w-full">
                     <ResponsiveContainer width="100%" height="100%">

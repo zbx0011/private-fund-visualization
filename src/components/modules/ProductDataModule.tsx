@@ -17,8 +17,10 @@ export function ProductDataModule({ funds, loading, lastSyncTime }: ProductDataM
 
 
     const columns = [
+        { key: 'index', label: '序号', format: (_: any, __: any, index: number) => index >= 0 ? index + 1 : '-' },
         { key: 'name', label: '基金名称', sortable: true },
         { key: 'strategy', label: '策略', sortable: true },
+        { key: 'status', label: '状态', sortable: true },
         { key: 'manager', label: '投资经理', sortable: true },
         { key: 'latest_nav_date', label: '最新净值日期', sortable: true, format: (v: string) => new Date(v).toLocaleDateString('zh-CN') },
         { key: 'daily_pnl', label: '本日收益', sortable: true, format: (v: number) => formatCurrency(v) },
@@ -27,10 +29,10 @@ export function ProductDataModule({ funds, loading, lastSyncTime }: ProductDataM
         { key: 'yearly_return', label: '本年收益率', sortable: true, format: (v: number) => formatPercent(v) },
         { key: 'concentration', label: '集中度', sortable: true, format: (v: number) => v ? formatPercentUnsigned(v) : '-' },
         { key: 'cost', label: '成本', sortable: true, format: (v: number) => formatCurrency(v) },
+        { key: 'authorized_scale', label: '授权投资规模', sortable: true, format: (v: number) => v ? formatCurrency(v) : '-' },
+        { key: 'remaining_quota', label: '剩余投资额度', sortable: true, format: (v: number) => v ? formatCurrency(v) : '-' },
         { key: 'max_drawdown', label: '最大回撤', sortable: true, format: (v: number) => formatPercentUnsigned(v) },
         { key: 'sharpe_ratio', label: '夏普比率', sortable: true, format: (v: number) => v?.toFixed(3) || '-' },
-        { key: 'volatility', label: '波动率', sortable: true, format: (v: number) => formatPercentUnsigned(v) },
-        { key: 'status', label: '状态', sortable: true },
     ]
 
     const handleRowClick = async (fund: any) => {

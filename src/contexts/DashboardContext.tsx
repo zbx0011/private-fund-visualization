@@ -1,6 +1,7 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
+import { useYear } from './YearContext'
 
 interface DashboardContextType {
     data: any
@@ -19,22 +20,25 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     const [monitorData, setMonitorData] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const { selectedYear } = useYear()
 
-    const refreshData = async () => {
+    const refreshData = useCallback(async () => {
         try {
             setLoading(true)
             setError(null)
 
-            // Parallel fetch for all required data
-            const [fundsRes, yieldRes, monitorRes] = await Promise.all([
+            // Parallel fetch for all required data (with year parameter for yield-curve)
+            const [fundsRes, yieldRes, monitorRes, yearlyReturnRes] = await Promise.all([
                 fetch('/api/funds?type=excluded-fof', { cache: 'no-store' }),
-                fetch('/api/yield-curve', { cache: 'no-store' }),
-                fetch('/api/monitor?limit=50', { cache: 'no-store' })
+                fetch(`/api/yield-curve?year=${selectedYear}`, { cache: 'no-store' }),
+                fetch('/api/monitor?limit=50', { cache: 'no-store' }),
+                fetch(`/api/funds/yearly-return?year=${selectedYear}`, { cache: 'no-store' })
             ])
 
             const fundsJson = await fundsRes.json()
             const yieldJson = await yieldRes.json()
             const monitorJson = await monitorRes.json()
+            const yearlyReturnJson = await yearlyReturnRes.json()
 
             if (!fundsJson.success) throw new Error(fundsJson.error || 'Failed to fetch funds')
 
@@ -57,11 +61,23 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
             const totalWeeklyPnl = funds.reduce((sum: number, f: any) => sum + (f.weekly_pnl || 0), 0)
             const weeklyReturn = totalDailyCapitalUsage ? totalWeeklyPnl / totalDailyCapitalUsage : 0
 
-            // 本年收益 = 所有基金的本年收益之和（与飞书一致，包含已赎回）
-            const totalYearlyPnl = funds.reduce((sum: number, f: any) => sum + (f.yearly_pnl || 0), 0)
-
-            // 本年收益率 = 本年收益 / 日均资金占用
-            const annualReturn = totalDailyCapitalUsage ? totalYearlyPnl / totalDailyCapitalUsage : 0
+            // 本年收益率 - 从 yearly-return API 获取指定年份的数据计算
+            let annualReturn = 0
+            if (yearlyReturnJson.success && yearlyReturnJson.data) {
+                // Calculate weighted average return for the selected year
+                const yearlyData = yearlyReturnJson.data
+                let totalWeightedReturn = 0
+                let totalWeight = 0
+                yearlyData.forEach((f: any) => {
+                    const cost = f.cost || f.daily_capital_usage || 0
+                    const ret = f.yearly_return || 0
+                    if (cost > 0) {
+                        totalWeightedReturn += ret * cost
+                        totalWeight += cost
+                    }
+                })
+                annualReturn = totalWeight > 0 ? totalWeightedReturn / totalWeight : 0
+            }
 
             // Map strategy stats
             const strategyData = strategyStats
@@ -99,11 +115,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         } finally {
             setLoading(false)
         }
-    }
+    }, [selectedYear])
 
     useEffect(() => {
         refreshData()
-    }, [])
+    }, [refreshData])
 
     return (
         <DashboardContext.Provider value={{ data, yieldCurveData, monitorData, loading, error, refreshData }}>

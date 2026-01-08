@@ -41,6 +41,8 @@ export class Database {
         weekly_pnl REAL,
         yearly_pnl REAL,
         yearly_return REAL,
+        authorized_scale REAL,
+        remaining_quota REAL,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `)
@@ -323,9 +325,9 @@ export class Database {
   }
 
 
-  async getYieldCurveData(startDate: string = '2025-01-01'): Promise<any> {
+  async getYieldCurveData(startDate: string = '2025-01-01', endDate?: string): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.db.all(`
+      let query = `
         SELECT 
           h.nav_date as date,
           h.cumulative_nav,
@@ -336,8 +338,17 @@ export class Database {
         FROM fund_nav_history h
         JOIN funds f ON (h.fund_id = f.record_id OR h.fund_id = f.name)
         WHERE h.nav_date >= ?
-        ORDER BY h.nav_date ASC
-      `, [startDate], (err, rows) => {
+      `
+      const params: string[] = [startDate]
+
+      if (endDate) {
+        query += ` AND h.nav_date < ?`
+        params.push(endDate)
+      }
+
+      query += ` ORDER BY h.nav_date ASC`
+
+      this.db.all(query, params, (err, rows) => {
         if (err) reject(err)
         else resolve(rows)
       })

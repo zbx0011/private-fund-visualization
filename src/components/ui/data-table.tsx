@@ -5,7 +5,7 @@ import { useState } from 'react'
 interface Column {
     key: string
     label: string
-    format?: (value: any) => React.ReactNode
+    format?: (value: any, row: any, index: number) => React.ReactNode
     sortable?: boolean
 }
 
@@ -67,7 +67,7 @@ export function DataTable({ columns, data, onRowClick, rowClassName, footerRow }
                         >
                             {columns.map((col) => (
                                 <td key={col.key} className="px-3 py-3 whitespace-nowrap text-xs text-gray-900">
-                                    {col.format ? col.format(row[col.key]) : row[col.key]}
+                                    {col.format ? col.format(row[col.key], row, rowIndex) : row[col.key]}
                                 </td>
                             ))}
                         </tr>
@@ -77,7 +77,7 @@ export function DataTable({ columns, data, onRowClick, rowClassName, footerRow }
                             {columns.map((col) => (
                                 <td key={col.key} className="px-3 py-3 whitespace-nowrap text-xs text-gray-900">
                                     {footerRow[col.key] !== undefined
-                                        ? (col.format ? col.format(footerRow[col.key]) : footerRow[col.key])
+                                        ? (col.format ? col.format(footerRow[col.key], footerRow, -1) : footerRow[col.key])
                                         : ''}
                                 </td>
                             ))}

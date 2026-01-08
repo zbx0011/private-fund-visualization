@@ -1,5 +1,12 @@
 import axios from 'axios'
 
+// 强制设置代理以解决 Clash Fake-IP 模式下的 DNS 解析问题
+process.env.HTTP_PROXY = 'http://127.0.0.1:7890'
+process.env.HTTPS_PROXY = 'http://127.0.0.1:7890'
+
+// 创建默认 axios 实例 (将会自动使用环境变量中的代理设置)
+const axiosNoProxy = axios.create()
+
 interface LarkConfig {
   appId: string
   appSecret: string
@@ -51,7 +58,7 @@ export class LarkBitableAPI {
     }
 
     try {
-      const response = await axios.post(
+      const response = await axiosNoProxy.post(
         `${this.config.baseUrl}/open-apis/auth/v3/tenant_access_token/internal`,
         {
           app_id: this.config.appId,
@@ -91,7 +98,7 @@ export class LarkBitableAPI {
           params.page_token = pageToken
         }
 
-        const response = await axios.get<BitableResponse>(url, {
+        const response = await axiosNoProxy.get<BitableResponse>(url, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
@@ -124,7 +131,7 @@ export class LarkBitableAPI {
     const accessToken = await this.getAccessToken()
 
     try {
-      const response = await axios.get(
+      const response = await axiosNoProxy.get(
         `${this.config.baseUrl}/open-apis/bitable/v1/apps/${appToken}/tables`,
         {
           headers: {
@@ -152,7 +159,7 @@ export class LarkBitableAPI {
     const accessToken = await this.getAccessToken()
 
     try {
-      const response = await axios.get(
+      const response = await axiosNoProxy.get(
         `${this.config.baseUrl}/open-apis/bitable/v1/apps/${appToken}`,
         {
           headers: {
@@ -180,7 +187,7 @@ export class LarkBitableAPI {
     const accessToken = await this.getAccessToken()
 
     try {
-      const response = await axios.get(
+      const response = await axiosNoProxy.get(
         `${this.config.baseUrl}/open-apis/bitable/v1/apps/${appToken}/tables/${tableId}/fields`,
         {
           headers: {

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getDatabase } from '@/lib/database-server'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
     try {
         const db = getDatabase()

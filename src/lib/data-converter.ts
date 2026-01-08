@@ -27,6 +27,8 @@ interface FundData {
   dailyCapitalUsage?: number
   weeklyPnl?: number
   yearlyPnl?: number
+  authorizedScale?: number
+  remainingQuota?: number
 }
 
 interface FieldMapping {
@@ -79,27 +81,56 @@ export class DataConverter {
     '本年收益率': 'yearlyReturn' // 修正：本年收益率对应yearlyReturn
   }
 
-  // 策略类型选项ID的临时映射（基于已知的选项）
+  // 策略类型选项ID的映射（基于飞书多维表格的单选选项）
   private static strategyOptionMapping: Record<string, string> = {
+    // 从飞书私募盈亏一览表收集的选项ID
     'opteZ8clPp': '指增',
     'optAf8gJwT': '指增',
+    'optosjZjrj': '指增',
     'optBf2hKwU': 'CTA',
+    'optpdOvS5N': 'CTA',
     'optCg3lLxV': '量选',
+    'optA6mwCSf': '量选',
     'optDh4mMyW': '宏观',
+    'optzfP45xD': '宏观',
     'optEi5nNzX': '套利',
+    'optcXUA9c6': '套利',
     'optFj6oOaY': '债券',
     'optGk7pPbZ': '混合',
+    'optMJZQ4p5': '混合',
     'optHl8qQcA': '管理期货',
     'optvE8Axra': '中性',
-    'optztNchXY': '可转债',  // 修正：优美利金安长牛2号 -> 可转债
-    'optA6mwCSf': '量选',  // 修正：大道萑苇 -> 量选
+    'optztNchXY': '可转债',
     'optN5SM1ew': 'T0',
-    'optMJZQ4p5': '混合',
-    'optpdOvS5N': 'CTA',
-    'optcXUA9c6': '套利',
-    'optHhPUvUQ': '择时对冲', // 修正：赫富灵活对冲一号 -> 择时对冲
+    'optHhPUvUQ': '择时对冲',
     'optC7xvukD': '期权',
-    'optTiming': '择时'
+    'optTiming': '择时',
+    'opty6M69yX': '择时选股',  // 正仁股票择时三期
+    // 直接文本值映射（保险起见）
+    '指增': '指增',
+    '中性': '中性',
+    'CTA': 'CTA',
+    'T0': 'T0',
+    '套利': '套利',
+    '量选': '量选',
+    '混合': '混合',
+    '期权': '期权',
+    '择时对冲': '择时对冲',
+    '可转债': '可转债',
+    '宏观': '宏观',
+    '择时选股': '择时选股',
+    '择时': '择时'
+  }
+
+  // 状态选项ID的映射
+  private static statusOptionMapping: Record<string, string> = {
+    'optFl1SLci': '已赎回',
+    'optMPo88zD': '申购中',
+    'optPnmn3js': '华泰fof',
+    // 直接文本值映射
+    '已赎回': '已赎回',
+    '申购中': '申购中',
+    '华泰fof': '华泰fof'
   }
 
   /**
@@ -200,7 +231,9 @@ export class DataConverter {
         '日均资金占用': 'dailyCapitalUsage', // Added
         '本周收益': 'weeklyPnl', // Added
         '本年收益': 'yearlyPnl', // Added
-        '本日盈亏': 'dailyPnl' // Added: 这才是正确的日盈亏数据源
+        '本日盈亏': 'dailyPnl', // Added: 这才是正确的日盈亏数据源
+        '授权投资规模': 'authorizedScale', // 授权投资规模
+        '剩余投资额度': 'remainingQuota' // 剩余投资额度
       }
     }
 
@@ -302,6 +335,16 @@ export class DataConverter {
           fundData.yearlyPnl = this.parseCurrency(yearlyPnl)
         }
 
+        const authorizedScale = this.getFieldValue(record.fields, 'authorizedScale', mapping, optionMappings)
+        if (authorizedScale !== null && authorizedScale !== undefined) {
+          fundData.authorizedScale = this.parseCurrency(authorizedScale)
+        }
+
+        const remainingQuota = this.getFieldValue(record.fields, 'remainingQuota', mapping, optionMappings)
+        if (remainingQuota !== null && remainingQuota !== undefined) {
+          fundData.remainingQuota = this.parseCurrency(remainingQuota)
+        }
+
         // 调试信息
         if (record.record_id === 'recuUuIP4mWMQn') {
           console.log('=== 调试第一条记录转换 ===')
@@ -357,15 +400,10 @@ export class DataConverter {
 
           const extractedValue = this.extractTextValue(value)
 
-          // For status field, apply hardcoded mapping for option IDs
+          // For status field, apply statusOptionMapping for option IDs
           if (targetKey === 'status') {
-            const STATUS_ID_MAP: Record<string, string> = {
-              'optFl1SLci': '已赎回',  // Option ID for "已赎回" (Redeemed)
-              '已赎回': '已赎回'       // Direct text value
-            };
-
-            if (STATUS_ID_MAP[extractedValue]) {
-              return STATUS_ID_MAP[extractedValue];
+            if (this.statusOptionMapping[extractedValue]) {
+              return this.statusOptionMapping[extractedValue];
             }
           }
 

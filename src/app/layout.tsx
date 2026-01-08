@@ -7,6 +7,7 @@ export const metadata: Metadata = {
 };
 
 import { DashboardProvider } from "@/contexts/DashboardContext";
+import { YearProvider } from "@/contexts/YearContext";
 
 export default function RootLayout({
   children,
@@ -16,9 +17,11 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className="antialiased font-sans">
-        <DashboardProvider>
-          {children}
-        </DashboardProvider>
+        <YearProvider>
+          <DashboardProvider>
+            {children}
+          </DashboardProvider>
+        </YearProvider>
       </body>
     </html>
   );

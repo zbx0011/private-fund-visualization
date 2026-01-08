@@ -72,6 +72,13 @@ export class LarkSyncService {
           console.log(`  正在获取表格 ${table.id} 的数据...`)
           const records = await this.api.getBitableRecords(config.appToken, table.id)
           console.log(`  获取到 ${records.length} 条记录`)
+          // 对FOF表进行特殊处理（设置默认值）
+          if (table.id === 'tblXwpq4lQzfymME') {
+            records.forEach((item: any) => {
+              if (!item.fields.strategy) item.fields.strategy = 'FOF'
+              if (!item.fields.manager) item.fields.manager = '华泰fof'
+            })
+          }
           if (table.id === 'tblcK2mWFtgob3Dg') {
             const fs = require('fs');
             const path = require('path');
@@ -333,6 +340,16 @@ export class LarkSyncService {
         values.push(fund.yearlyPnl)
       }
 
+      if (fund.authorizedScale !== undefined) {
+        fields.push('authorized_scale = ?')
+        values.push(fund.authorizedScale)
+      }
+
+      if (fund.remainingQuota !== undefined) {
+        fields.push('remaining_quota = ?')
+        values.push(fund.remainingQuota)
+      }
+
       // Always update timestamp
       fields.push('updated_at = CURRENT_TIMESTAMP')
 
@@ -367,8 +384,9 @@ export class LarkSyncService {
           record_id, name, strategy, manager, latest_nav_date, cumulative_return,
           annualized_return, max_drawdown, sharpe_ratio, volatility,
           total_assets, standing_assets, cash_allocation, status,
-          establishment_date, cost, scale, weekly_return, daily_return, daily_pnl, concentration, source_table
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          establishment_date, cost, scale, weekly_return, daily_return, daily_pnl, concentration, source_table,
+          authorized_scale, remaining_quota
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
       stmt.run([
@@ -393,7 +411,9 @@ export class LarkSyncService {
         fund.dailyReturn || 0,
         fund.dailyPnl || 0,
         fund.concentration || 0,
-        (fund as any).source_table
+        (fund as any).source_table,
+        fund.authorizedScale || 0,
+        fund.remainingQuota || 0
       ], (err: Error | null) => {
         if (err) reject(err)
         else resolve()
