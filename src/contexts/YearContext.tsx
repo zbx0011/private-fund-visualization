@@ -11,7 +11,7 @@ interface YearContextType {
 const YearContext = createContext<YearContextType | undefined>(undefined)
 
 export function YearProvider({ children }: { children: ReactNode }) {
-    const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+    const [selectedYear, setSelectedYear] = useState<number>(2025)
     const availableYears = [2025, 2026]
 
     return (
